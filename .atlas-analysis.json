@@ -1,0 +1,117 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "React Scan",
+  "projectDescription": "Automatically detect and visualize performance issues in React applications",
+  "theme": "aspen",
+  "primaryColor": "#7C3AED",
+  "lightColor": "#A78BFA",
+  "darkColor": "#5B21B6",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Installation",
+            "pages": [
+              "installation/script-tag",
+              "installation/next-app-router",
+              "installation/next-pages-router",
+              "installation/vite",
+              "installation/remix",
+              "installation/astro",
+              "installation/create-react-app",
+              "installation/parcel",
+              "installation/rsbuild",
+              "installation/react-router",
+              "installation/tanstack-start"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/toolbar",
+              "features/render-detection",
+              "features/performance-monitoring",
+              "features/browser-extension"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/understanding-renders",
+              "guides/optimizing-performance",
+              "guides/custom-monitoring",
+              "guides/production-usage"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api-reference/scan",
+              "api-reference/use-scan",
+              "api-reference/set-options",
+              "api-reference/get-options",
+              "api-reference/on-render",
+              "api-reference/ignore-scan"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "api-reference/options",
+              "api-reference/types"
+            ]
+          },
+          {
+            "group": "CLI",
+            "pages": [
+              "api-reference/cli-init"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "api-reference/vite-plugin",
+              "api-reference/webpack-plugin",
+              "api-reference/build-tools"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Automatic performance issue detection",
+    "Visual render highlighting",
+    "Development toolbar with FPS meter",
+    "Browser extension support",
+    "CLI for easy setup",
+    "Framework-agnostic React support",
+    "Production safety with opt-in",
+    "Custom component monitoring hooks"
+  ],
+  "publicApiSurface": [
+    "scan(options)",
+    "useScan(options)",
+    "setOptions(options)",
+    "getOptions()",
+    "onRender(component, callback)",
+    "ignoreScan(node)",
+    "getReport(type)",
+    "Options interface",
+    "CLI: react-scan init"
+  ]
+}
