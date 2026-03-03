@@ -1,0 +1,385 @@
+---
+title: Optimizing Performance
+description: How to fix performance issues detected by React Scan
+---
+
+Once React Scan identifies performance issues in your app, you can use various optimization techniques to improve render performance.
+
+## Identifying Problem Components
+
+### Using the Toolbar
+
+The React Scan toolbar shows:
+- **FPS meter** - Current frames per second
+- **Notification count** - Number of slowdowns detected
+- **Enable/disable toggle** - Control scanning
+
+You can toggle these features:
+
+```typescript
+scan({
+  showFPS: true,              // Show FPS meter (default: true)
+  showNotificationCount: true, // Show slowdown count (default: true)
+});
+```
+
+From `packages/scan/src/core/index.ts:112-120`
+
+### Reading Render Data
+
+Access render data programmatically:
+
+```typescript
+import { getReport } from 'react-scan';
+
+// Get all render data
+const allReports = getReport();
+
+// Get data for a specific component
+const MyComponentData = getReport(MyComponent);
+```
+
+The render data includes:
+
+```typescript
+interface RenderData {
+  count: number;           // Total render count
+  time: number;            // Cumulative render time
+  renders: Array<Render>;  // Detailed render history
+  displayName: string | null;
+  type: unknown;
+  changes?: Array<RenderChange>;
+}
+```
+
+From `packages/scan/src/core/utils.ts:166-173`
+
+## Common Optimization Patterns
+
+### Stabilizing Inline Functions
+
+**Problem:**
+```jsx
+// ❌ Creates a new function on every render
+<Button onClick={() => handleClick(id)} />
+```
+
+**Solution:**
+```jsx
+// ✅ Memoize the callback
+import { useCallback } from 'react';
+
+const handleButtonClick = useCallback(() => {
+  handleClick(id);
+}, [id]);
+
+<Button onClick={handleButtonClick} />
+```
+
+### Stabilizing Inline Objects
+
+**Problem:**
+```jsx
+// ❌ Creates a new object on every render
+<Component style={{ color: 'purple' }} />
+```
+
+**Solution:**
+```jsx
+// ✅ Move outside component or memoize
+const style = { color: 'purple' };
+<Component style={style} />
+
+// Or use useMemo for dynamic values
+const style = useMemo(() => ({ color: theme.primary }), [theme.primary]);
+<Component style={style} />
+```
+
+### Memoizing Components
+
+**Problem:**
+```jsx
+// ❌ Re-renders even when props haven't changed
+function ExpensiveComponent({ data }) {
+  // Expensive computations...
+  return <div>{/* ... */}</div>;
+}
+```
+
+**Solution:**
+```jsx
+// ✅ Wrap with React.memo
+import { memo } from 'react';
+
+const ExpensiveComponent = memo(function ExpensiveComponent({ data }) {
+  // Expensive computations...
+  return <div>{/* ... */}</div>;
+});
+```
+
+### Memoizing Expensive Computations
+
+**Problem:**
+```jsx
+// ❌ Recalculates on every render
+function Component({ items }) {
+  const sortedItems = items.sort((a, b) => a.value - b.value);
+  return <List items={sortedItems} />;
+}
+```
+
+**Solution:**
+```jsx
+// ✅ Use useMemo
+import { useMemo } from 'react';
+
+function Component({ items }) {
+  const sortedItems = useMemo(
+    () => items.sort((a, b) => a.value - b.value),
+    [items]
+  );
+  return <List items={sortedItems} />;
+}
+```
+
+## Advanced Optimization Techniques
+
+### Splitting Components
+
+Move frequently updating state down to child components:
+
+**Problem:**
+```jsx
+// ❌ Entire form re-renders on every keystroke
+function Form() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  
+  return (
+    <div>
+      <ExpensiveHeader />
+      <input value={name} onChange={e => setName(e.target.value)} />
+      <input value={email} onChange={e => setEmail(e.target.value)} />
+      <ExpensiveFooter />
+    </div>
+  );
+}
+```
+
+**Solution:**
+```jsx
+// ✅ Extract input fields to own components
+function NameInput() {
+  const [name, setName] = useState('');
+  return <input value={name} onChange={e => setName(e.target.value)} />;
+}
+
+function EmailInput() {
+  const [email, setEmail] = useState('');
+  return <input value={email} onChange={e => setEmail(e.target.value)} />;
+}
+
+function Form() {
+  return (
+    <div>
+      <ExpensiveHeader />
+      <NameInput />
+      <EmailInput />
+      <ExpensiveFooter />
+    </div>
+  );
+}
+```
+
+### Using Children as Props
+
+Prevent re-rendering expensive children:
+
+```jsx
+// ✅ Children won't re-render when state changes
+function Layout({ children }) {
+  const [count, setCount] = useState(0);
+  
+  return (
+    <div>
+      <button onClick={() => setCount(c => c + 1)}>{count}</button>
+      {children}
+    </div>
+  );
+}
+
+<Layout>
+  <ExpensiveComponent />
+</Layout>
+```
+
+### Context Optimization
+
+Split contexts to avoid unnecessary re-renders:
+
+**Problem:**
+```jsx
+// ❌ All consumers re-render when any value changes
+const AppContext = createContext();
+
+function Provider({ children }) {
+  const [user, setUser] = useState(null);
+  const [theme, setTheme] = useState('light');
+  
+  return (
+    <AppContext.Provider value={{ user, setUser, theme, setTheme }}>
+      {children}
+    </AppContext.Provider>
+  );
+}
+```
+
+**Solution:**
+```jsx
+// ✅ Separate contexts for different concerns
+const UserContext = createContext();
+const ThemeContext = createContext();
+
+function Provider({ children }) {
+  const [user, setUser] = useState(null);
+  const [theme, setTheme] = useState('light');
+  
+  return (
+    <UserContext.Provider value={{ user, setUser }}>
+      <ThemeContext.Provider value={{ theme, setTheme }}>
+        {children}
+      </ThemeContext.Provider>
+    </UserContext.Provider>
+  );
+}
+```
+
+## Debugging with onRender Hook
+
+Use the `onRender` callback to debug specific components:
+
+```typescript
+import { scan, onRender } from 'react-scan';
+
+scan({
+  onRender: (fiber, renders) => {
+    const render = renders[0];
+    console.log('Component rendered:', {
+      name: render.componentName,
+      phase: render.phase,
+      time: render.time,
+      changes: render.changes,
+      unnecessary: render.unnecessary,
+    });
+  }
+});
+
+// Or monitor a specific component
+onRender(MyComponent, (fiber, renders) => {
+  console.log('MyComponent rendered:', renders);
+});
+```
+
+From `packages/scan/src/core/index.ts:138-141` and `packages/scan/src/core/index.ts:549-560`
+
+## Ignoring Scan for Specific Elements
+
+Sometimes you want to exclude certain components from tracking:
+
+```typescript
+import { ignoreScan } from 'react-scan';
+
+function Component() {
+  const animatedElement = <div>Animated content</div>;
+  ignoreScan(animatedElement);
+  
+  return animatedElement;
+}
+```
+
+From `packages/scan/src/core/index.ts:566-570`
+
+## Performance Metrics to Watch
+
+### Render Count
+
+Track how many times components render:
+
+```typescript
+interface RenderData {
+  selfTime: number;           // Component's own render time
+  totalTime: number;          // Including children
+  renderCount: number;        // Number of renders
+  lastRenderTimestamp: number; // When it last rendered
+}
+```
+
+From `packages/scan/src/core/instrumentation.ts:425-430`
+
+### Render Debouncing
+
+React Scan automatically debounces renders within 16ms to avoid tracking rapid-fire updates:
+
+```typescript
+const RENDER_DEBOUNCE_MS = 16;
+
+const trackRender = (
+  fiber: Fiber,
+  fiberSelfTime: number,
+  fiberTotalTime: number,
+  hasChanges: boolean,
+  hasDomMutations: boolean,
+) => {
+  const currentTimestamp = Date.now();
+  const existingData = getRenderData(fiber);
+
+  if (
+    (hasChanges || hasDomMutations) &&
+    (!existingData ||
+      currentTimestamp - (existingData.lastRenderTimestamp || 0) > RENDER_DEBOUNCE_MS)
+  ) {
+    // Track the render
+  }
+};
+```
+
+From `packages/scan/src/core/instrumentation.ts:443-489`
+
+<Tip>
+**Best Practice**: Focus on optimizing components that render frequently (high count) and take significant time (high selfTime).
+</Tip>
+
+## Using React Compiler
+
+React Scan automatically detects components optimized with React Compiler:
+
+```typescript
+const render: Render = {
+  // ...
+  forget: hasMemoCache(fiber), // ✨ Marks compiler-optimized components
+  // ...
+};
+```
+
+React Compiler automatically memoizes components and values, reducing the need for manual optimization.
+
+<Accordion title="When should I use manual optimization vs React Compiler?">
+React Compiler is the future of React optimization and handles most cases automatically. Use manual optimization (memo, useMemo, useCallback) for:
+- Projects not yet using React Compiler
+- Specific hot paths that need fine-tuned control
+- Libraries that need to work with older React versions
+</Accordion>
+
+<Accordion title="How do I know if an optimization worked?">
+After applying optimizations:
+1. Check the render count decreases in React Scan
+2. Verify the component outline appears less frequently
+3. Monitor the FPS meter for improvements
+4. Use the onRender callback to log before/after metrics
+</Accordion>
+
+## Next Steps
+
+- Set up [custom monitoring](/guides/custom-monitoring) for production insights
+- Learn about [production usage](/guides/production-usage) and safety
+- Understand [what causes renders](/guides/understanding-renders) in detail

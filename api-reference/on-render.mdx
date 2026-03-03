@@ -1,0 +1,211 @@
+---
+title: 'onRender()'
+description: 'Monitor renders for specific components'
+---
+
+## Overview
+
+The `onRender()` function allows you to hook into render events for a specific component type. This is useful for custom performance monitoring, debugging, or analytics.
+
+## Signature
+
+```typescript
+onRender(
+  type: unknown,
+  callback: (fiber: Fiber, renders: Array<Render>) => void
+): void
+```
+
+## Parameters
+
+<ParamField path="type" type="unknown" required>
+  The component type to monitor. This is typically a component function or class reference.
+</ParamField>
+
+<ParamField path="callback" type="(fiber: Fiber, renders: Array<Render>) => void" required>
+  Callback function invoked when the specified component renders.
+  
+  <Expandable title="Callback Parameters">
+    <ParamField path="fiber" type="Fiber">
+      The React Fiber node representing the component instance. Contains internal React data about the component.
+    </ParamField>
+    
+    <ParamField path="renders" type="Array<Render>">
+      Array of render information objects.
+      
+      <Expandable title="Render Object Properties">
+        <ParamField path="phase" type="RenderPhase">
+          The phase of the render (mount or update)
+        </ParamField>
+        
+        <ParamField path="componentName" type="string | null">
+          Name of the component that rendered
+        </ParamField>
+        
+        <ParamField path="time" type="number | null">
+          Render time in milliseconds
+        </ParamField>
+        
+        <ParamField path="count" type="number">
+          Number of times this component has rendered
+        </ParamField>
+        
+        <ParamField path="forget" type="boolean">
+          Whether React Forget optimization was used
+        </ParamField>
+        
+        <ParamField path="changes" type="Array<Change>">
+          Array of detected changes that caused the render (props, state, or context changes)
+        </ParamField>
+        
+        <ParamField path="unnecessary" type="boolean | null">
+          Whether the render was unnecessary (only available if `trackUnnecessaryRenders` is enabled)
+        </ParamField>
+        
+        <ParamField path="didCommit" type="boolean">
+          Whether the render resulted in a DOM commit
+        </ParamField>
+        
+        <ParamField path="fps" type="number">
+          Current frames per second
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Returns
+
+`void` - This function does not return a value.
+
+## Usage
+
+### Monitor Specific Component
+
+```tsx
+import { onRender } from 'react-scan';
+import { MyComponent } from './MyComponent';
+
+onRender(MyComponent, (fiber, renders) => {
+  console.log('MyComponent rendered:', renders);
+});
+```
+
+### Track Render Performance
+
+```tsx
+import { onRender } from 'react-scan';
+import { ExpensiveComponent } from './ExpensiveComponent';
+
+onRender(ExpensiveComponent, (fiber, renders) => {
+  renders.forEach(render => {
+    if (render.time && render.time > 16) {
+      console.warn(`Slow render detected: ${render.time}ms`);
+    }
+  });
+});
+```
+
+### Log Render Changes
+
+```tsx
+import { onRender } from 'react-scan';
+import { UserProfile } from './UserProfile';
+
+onRender(UserProfile, (fiber, renders) => {
+  renders.forEach(render => {
+    console.log(`${render.componentName} render #${render.count}`);
+    console.log('Changes:', render.changes);
+  });
+});
+```
+
+### Detect Unnecessary Renders
+
+```tsx
+import { onRender, setOptions } from 'react-scan';
+import { MyComponent } from './MyComponent';
+
+// Enable unnecessary render tracking
+setOptions({ trackUnnecessaryRenders: true });
+
+onRender(MyComponent, (fiber, renders) => {
+  renders.forEach(render => {
+    if (render.unnecessary) {
+      console.warn('Unnecessary render detected in', render.componentName);
+      console.log('Changes:', render.changes);
+    }
+  });
+});
+```
+
+### Send Analytics
+
+```tsx
+import { onRender } from 'react-scan';
+import { CriticalComponent } from './CriticalComponent';
+
+onRender(CriticalComponent, (fiber, renders) => {
+  renders.forEach(render => {
+    // Send performance data to analytics service
+    analytics.track('component_render', {
+      component: render.componentName,
+      time: render.time,
+      count: render.count,
+      fps: render.fps,
+    });
+  });
+});
+```
+
+### Monitor Multiple Components
+
+```tsx
+import { onRender } from 'react-scan';
+import { ComponentA, ComponentB, ComponentC } from './components';
+
+const components = [ComponentA, ComponentB, ComponentC];
+
+components.forEach(Component => {
+  onRender(Component, (fiber, renders) => {
+    console.log(`${Component.name} rendered`);
+  });
+});
+```
+
+## Behavior
+
+- Multiple `onRender` calls for the same component type will chain callbacks - all callbacks will be invoked
+- The callback is invoked after the component renders but before the browser paints
+- Callbacks are stored globally and persist until the page reloads
+- The `fiber` parameter provides low-level access to React's internal fiber tree
+
+<Warning>
+  Be cautious when using the `fiber` parameter. React's internal fiber structure is not a public API and may change between React versions.
+</Warning>
+
+## Performance Considerations
+
+- Keep callback functions lightweight to avoid impacting render performance
+- Avoid heavy computations or synchronous operations in callbacks
+- Be mindful when logging frequently-rendering components
+
+```tsx
+// ❌ Avoid heavy operations
+onRender(MyComponent, (fiber, renders) => {
+  // Heavy serialization on every render
+  const serialized = JSON.stringify(fiber, null, 2);
+  console.log(serialized);
+});
+
+// ✅ Better: Keep it lightweight
+onRender(MyComponent, (fiber, renders) => {
+  console.log('Render count:', renders[0]?.count);
+});
+```
+
+## See Also
+
+- [Options](/api-reference/options) - Configure global render callbacks
+- [setOptions()](/api-reference/set-options) - Set global `onRender` callback
+- [Types](/api-reference/types) - Type definitions for Fiber and Render

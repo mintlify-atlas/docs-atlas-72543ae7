@@ -1,97 +1,149 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "React Scan"
+description: "Automatically detect and fix performance issues in your React app"
 ---
 
-## Setting up
+<img
+  src="/images/react-scan-demo.png"
+  alt="React Scan in action"
+  className="rounded-lg shadow-lg"
+/>
 
-Get your documentation site up and running in minutes.
+## What is React Scan?
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
+React Scan automatically detects performance issues in your React app. It highlights exactly the components you need to optimize, requires no code changes, and is always accessible through a toolbar on your page.
+
+<CardGroup cols={2}>
+  <Card title="Zero Configuration" icon="bolt">
+    Just drop it in - no code changes required. Works with any React app.
+  </Card>
+  <Card title="Precise Detection" icon="crosshairs">
+    Highlights exactly which components are causing performance issues.
+  </Card>
+  <Card title="Always Accessible" icon="wrench">
+    Built-in toolbar lets you toggle scanning and inspect renders on the fly.
+  </Card>
+  <Card title="Production Ready" icon="shield-check">
+    Safely use in development with automatic production detection.
+  </Card>
+</CardGroup>
+
+## Why React Scan?
+
+React can be tricky to optimize. Component props are compared by reference, not value - which is intentional, since rendering is often cheap. However, this makes it easy to accidentally cause unnecessary renders that slow down your app.
+
+Even production apps with hundreds of engineers struggle with optimization. React Scan helps you identify these issues automatically.
+
+<CodeGroup>
+
+```jsx Problem: Unnecessary Renders
+// This creates new objects on every render
+<ExpensiveComponent 
+  onClick={() => alert("hi")} 
+  style={{ color: "purple" }} 
+/>
+```
+
+```jsx Solution: Memoize References
+import { useCallback, useMemo } from 'react';
+
+// Stable references prevent unnecessary renders
+const onClick = useCallback(() => alert("hi"), []);
+const style = useMemo(() => ({ color: "purple" }), []);
+
+<ExpensiveComponent onClick={onClick} style={style} />
+```
+
+</CodeGroup>
+
+## Quick Start
+
+Get started in seconds with the automatic setup:
+
+```bash
+npx react-scan@latest init
+```
+
+The `init` command automatically:
+- Detects your framework (Next.js, Vite, Remix, etc.)
+- Installs the package
+- Configures your project
+
+<Card title="Get Started Now" icon="rocket" href="/quickstart">
+  Follow the complete quickstart guide to install and use React Scan
 </Card>
 
-## Make it yours
+## Key Features
 
-Design a docs site that looks great and empowers your users.
+<CardGroup cols={2}>
+  <Card title="Visual Render Detection" icon="eye" href="/features/render-detection">
+    See which components are re-rendering in real-time with visual highlights
+  </Card>
+  <Card title="Interactive Toolbar" icon="sliders" href="/features/toolbar">
+    Control scanning, inspect components, and view performance metrics
+  </Card>
+  <Card title="Performance Monitoring" icon="chart-line" href="/features/performance-monitoring">
+    Track FPS, slowdowns, and unnecessary render notifications
+  </Card>
+  <Card title="Browser Extension" icon="puzzle-piece" href="/features/browser-extension">
+    Install the extension to scan any React app without code changes
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+## How It Works
 
-## Create beautiful pages
+React Scan instruments React's internals to monitor component renders. When a component re-renders, React Scan:
 
-Everything you need to create world-class documentation.
+1. **Detects the render** and measures its performance impact
+2. **Highlights the component** with color-coded overlays (red for slow, yellow for fast)
+3. **Tracks changes** that caused the render (props, state, context)
+4. **Reports metrics** in the toolbar (render count, FPS, slowdowns)
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+All of this happens with minimal overhead, so you can keep React Scan running during development without impacting your workflow.
 
-## Need inspiration?
+## Browser Extension
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+No code changes needed! Install the React Scan browser extension to scan any React website:
+
+<Steps>
+  <Step title="Download the extension">
+    Available for Chrome and Firefox from the [GitHub releases](https://github.com/aidenybai/react-scan/blob/main/BROWSER_EXTENSION_GUIDE.md)
+  </Step>
+  <Step title="Navigate to any React site">
+    Open any website built with React
+  </Step>
+  <Step title="Click the extension icon">
+    React Scan will automatically start detecting renders
+  </Step>
+</Steps>
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="play" href="/quickstart">
+    Install React Scan and detect your first performance issue
+  </Card>
+  <Card title="Installation Methods" icon="download" href="/installation/script-tag">
+    Choose the best installation method for your framework
+  </Card>
+  <Card title="Understanding Renders" icon="book" href="/guides/understanding-renders">
+    Learn what causes components to re-render and how to fix it
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/scan">
+    Explore the full API for advanced use cases
+  </Card>
+</CardGroup>
+
+## Community & Support
+
+<CardGroup cols={3}>
+  <Card title="GitHub" icon="github" href="https://github.com/aidenybai/react-scan">
+    Star the repo and contribute
+  </Card>
+  <Card title="Discord" icon="discord" href="https://discord.gg/X9yFbcV2rF">
+    Join our community
+  </Card>
+  <Card title="Issues" icon="bug" href="https://github.com/aidenybai/react-scan/issues">
+    Report bugs and request features
+  </Card>
+</CardGroup>

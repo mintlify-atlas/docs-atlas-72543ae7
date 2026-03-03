@@ -1,0 +1,187 @@
+---
+title: 'getOptions()'
+description: 'Retrieve the current React Scan configuration'
+---
+
+## Overview
+
+The `getOptions()` function returns the current React Scan configuration options as a reactive signal.
+
+## Signature
+
+```typescript
+getOptions(): Signal<Options>
+```
+
+## Parameters
+
+This function takes no parameters.
+
+## Returns
+
+<ResponseField name="signal" type="Signal<Options>">
+  A Preact signal containing the current options object. Access the value using `.value`.
+  
+  <Expandable title="Options Properties">
+    <ResponseField name="enabled" type="boolean">
+      Whether scanning is enabled
+    </ResponseField>
+    
+    <ResponseField name="showToolbar" type="boolean">
+      Whether the toolbar is visible
+    </ResponseField>
+    
+    <ResponseField name="log" type="boolean">
+      Whether renders are logged to console
+    </ResponseField>
+    
+    <ResponseField name="animationSpeed" type="'slow' | 'fast' | 'off'">
+      Animation speed for render highlights
+    </ResponseField>
+    
+    <ResponseField name="dangerouslyForceRunInProduction" type="boolean">
+      Whether React Scan runs in production builds
+    </ResponseField>
+    
+    <ResponseField name="trackUnnecessaryRenders" type="boolean">
+      Whether unnecessary renders are tracked
+    </ResponseField>
+    
+    <ResponseField name="showFPS" type="boolean">
+      Whether FPS meter is shown in toolbar
+    </ResponseField>
+    
+    <ResponseField name="showNotificationCount" type="boolean">
+      Whether notification count is shown in toolbar
+    </ResponseField>
+    
+    <ResponseField name="allowInIframe" type="boolean">
+      Whether React Scan runs inside iframes
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage
+
+### Get Current Options
+
+```tsx
+import { getOptions } from 'react-scan';
+
+const options = getOptions();
+console.log(options.value);
+// {
+//   enabled: true,
+//   showToolbar: true,
+//   log: false,
+//   animationSpeed: 'fast',
+//   ...
+// }
+```
+
+### Check Specific Option
+
+```tsx
+import { getOptions } from 'react-scan';
+
+const options = getOptions();
+if (options.value.enabled) {
+  console.log('React Scan is enabled');
+}
+```
+
+### React to Changes
+
+```tsx
+import { getOptions } from 'react-scan';
+import { effect } from '@preact/signals';
+
+const options = getOptions();
+
+// React to option changes
+effect(() => {
+  console.log('Options changed:', options.value);
+});
+```
+
+### Use in React Component
+
+```tsx
+import { getOptions } from 'react-scan';
+import { useSignal } from '@preact/signals-react';
+
+function ToolbarToggle() {
+  const options = getOptions();
+  
+  return (
+    <button onClick={() => {
+      setOptions({ showToolbar: !options.value.showToolbar })
+    }}>
+      {options.value.showToolbar ? 'Hide' : 'Show'} Toolbar
+    </button>
+  );
+}
+```
+
+### Conditional Logic Based on Options
+
+```tsx
+import { getOptions } from 'react-scan';
+
+function setupMonitoring() {
+  const options = getOptions();
+  
+  if (options.value.log) {
+    // Set up console logging
+  }
+  
+  if (options.value.trackUnnecessaryRenders) {
+    // Set up unnecessary render tracking
+  }
+}
+```
+
+## Signal API
+
+The returned value is a [Preact signal](https://preactjs.com/guide/v10/signals/), which provides reactive updates:
+
+- **Read value**: Use `.value` to access the current options
+- **Subscribe to changes**: Signals automatically track dependencies in `effect()` or React components using `@preact/signals-react`
+- **Type-safe**: The signal is typed as `Signal<Options>` for full TypeScript support
+
+```tsx
+import { getOptions } from 'react-scan';
+import { effect } from '@preact/signals';
+
+const options = getOptions();
+
+// Automatically runs when options change
+effect(() => {
+  if (options.value.enabled) {
+    console.log('Scanning is active');
+  }
+});
+```
+
+## Default Values
+
+When React Scan initializes, the following default values are used:
+
+```typescript
+{
+  enabled: true,
+  log: false,
+  showToolbar: true,
+  animationSpeed: 'fast',
+  dangerouslyForceRunInProduction: false,
+  showFPS: true,
+  showNotificationCount: true,
+  allowInIframe: false,
+}
+```
+
+## See Also
+
+- [setOptions()](/api-reference/set-options) - Update options at runtime
+- [scan()](/api-reference/scan) - Initialize with options
+- [Options](/api-reference/options) - Full options reference

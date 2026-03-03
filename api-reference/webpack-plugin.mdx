@@ -1,0 +1,281 @@
+---
+title: 'Webpack Plugin'
+description: 'Webpack integration for React Scan using component name plugin'
+---
+
+## Installation
+
+```bash
+npm install react-scan
+```
+
+```bash
+pnpm add react-scan
+```
+
+```bash
+yarn add react-scan
+```
+
+## Usage
+
+React Scan provides a component name plugin that works with Webpack via the unplugin interface.
+
+```javascript title="webpack.config.js"
+const reactComponentNamePlugin = require('react-scan/react-component-name/webpack');
+
+module.exports = {
+  // ... other config
+  plugins: [
+    reactComponentNamePlugin.default({
+      // options
+    }),
+  ],
+};
+```
+
+## Plugin Options
+
+<ParamField path="include" type="FilterPattern">
+  Files to include for transformation.
+
+  Default: `**/*.{mtsx,mjsx,tsx,jsx}`
+
+  ```javascript
+  reactComponentNamePlugin.default({
+    include: '**/*.{tsx,jsx}',
+  })
+  ```
+</ParamField>
+
+<ParamField path="exclude" type="FilterPattern">
+  Files to exclude from transformation.
+
+  Default excludes:
+  - `**/node_modules/**`
+  - `**/_app.{jsx,tsx,js,ts}` (Next.js)
+  - `**/_document.{jsx,tsx,js,ts}` (Next.js)
+  - `**/api/**/*` (Next.js API routes)
+  - `**/.million/**/*` (Million.js)
+
+  ```javascript
+  reactComponentNamePlugin.default({
+    exclude: ['**/node_modules/**', '**/dist/**'],
+  })
+  ```
+</ParamField>
+
+<ParamField path="enforce" type="'pre' | 'post' | undefined" default="'post'">
+  Plugin enforcement order.
+
+  ```javascript
+  reactComponentNamePlugin.default({
+    enforce: 'post',
+  })
+  ```
+</ParamField>
+
+<ParamField path="flags" type="object">
+  Additional flags for component name transformation.
+
+  ```typescript
+  interface Flags {
+    noTryCatchDisplayNames?: boolean;
+    noStyledComponents?: boolean;
+    noCreateContext?: boolean;
+    ignoreComponentSubstrings?: Array<string>;
+  }
+  ```
+
+  ```javascript
+  reactComponentNamePlugin.default({
+    flags: {
+      noStyledComponents: true,
+      ignoreComponentSubstrings: ['Test', 'Mock'],
+    },
+  })
+  ```
+</ParamField>
+
+## What It Does
+
+The component name plugin automatically adds display names to your React components, making them easier to identify in React Scan.
+
+**Before:**
+```jsx
+const MyComponent = () => <div>Hello</div>;
+```
+
+**After:**
+```jsx
+const MyComponent = () => <div>Hello</div>;
+MyComponent.displayName = 'MyComponent';
+```
+
+## Full Configuration Example
+
+```javascript title="webpack.config.js"
+const reactComponentNamePlugin = require('react-scan/react-component-name/webpack');
+
+module.exports = {
+  mode: 'development',
+  entry: './src/index.js',
+  output: {
+    path: __dirname + '/dist',
+    filename: 'bundle.js',
+  },
+  module: {
+    rules: [
+      {
+        test: /\.(js|jsx|ts|tsx)$/,
+        exclude: /node_modules/,
+        use: {
+          loader: 'babel-loader',
+        },
+      },
+    ],
+  },
+  plugins: [
+    reactComponentNamePlugin.default({
+      include: '**/*.{tsx,jsx}',
+      exclude: [
+        '**/node_modules/**',
+        '**/test/**',
+      ],
+      flags: {
+        noTryCatchDisplayNames: false,
+      },
+    }),
+  ],
+};
+```
+
+## Integrating React Scan
+
+After setting up the Webpack plugin, initialize React Scan in your application:
+
+```javascript title="src/index.js"
+import { scan } from 'react-scan';
+
+if (process.env.NODE_ENV === 'development') {
+  scan({
+    enabled: true,
+    showToolbar: true,
+  });
+}
+```
+
+## Create React App
+
+For Create React App projects, you'll need to use a tool like [CRACO](https://craco.js.org/) or [react-app-rewired](https://github.com/timarney/react-app-rewired) to customize the Webpack configuration.
+
+### Using CRACO
+
+```bash
+npm install @craco/craco
+```
+
+```javascript title="craco.config.js"
+const reactComponentNamePlugin = require('react-scan/react-component-name/webpack');
+
+module.exports = {
+  webpack: {
+    plugins: {
+      add: [
+        reactComponentNamePlugin.default(),
+      ],
+    },
+  },
+};
+```
+
+Update `package.json`:
+```json
+{
+  "scripts": {
+    "start": "craco start",
+    "build": "craco build",
+    "test": "craco test"
+  }
+}
+```
+
+## Next.js
+
+For Next.js projects, modify `next.config.js`:
+
+```javascript title="next.config.js"
+const reactComponentNamePlugin = require('react-scan/react-component-name/webpack');
+
+module.exports = {
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.plugins.push(
+        reactComponentNamePlugin.default()
+      );
+    }
+    return config;
+  },
+};
+```
+
+Then initialize React Scan in your app:
+
+```tsx title="pages/_app.tsx"
+import { scan } from 'react-scan';
+
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  scan({
+    enabled: true,
+  });
+}
+
+function MyApp({ Component, pageProps }) {
+  return <Component {...pageProps} />;
+}
+
+export default MyApp;
+```
+
+## TypeScript
+
+The plugin works seamlessly with TypeScript. Ensure your `tsconfig.json` includes JSX files:
+
+```json title="tsconfig.json"
+{
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  },
+  "include": ["src/**/*"]
+}
+```
+
+## Troubleshooting
+
+### Plugin not working
+
+1. Verify the plugin is in the `plugins` array:
+   ```javascript
+   plugins: [reactComponentNamePlugin.default()]
+   ```
+
+2. Check that file extensions match the `include` pattern
+
+3. Ensure the plugin loads after your JSX/TSX loader
+
+### Display names not appearing
+
+Make sure the plugin processes files before they're bundled:
+
+```javascript
+reactComponentNamePlugin.default({
+  enforce: 'post', // Run after other transformations
+})
+```
+
+## See Also
+
+- [Configuration Options](/api-reference/options)
+- [Vite Plugin](/api-reference/vite-plugin)
+- [Build Tools](/api-reference/build-tools)
+- [CLI](/api-reference/cli-init)

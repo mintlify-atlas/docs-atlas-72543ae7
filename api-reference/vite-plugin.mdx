@@ -1,0 +1,276 @@
+---
+title: 'Vite Plugin'
+description: 'Official Vite plugin for React Scan'
+---
+
+## Installation
+
+```bash
+npm install vite-plugin-react-scan
+```
+
+```bash
+pnpm add vite-plugin-react-scan
+```
+
+```bash
+yarn add vite-plugin-react-scan
+```
+
+## Usage
+
+Add the plugin to your `vite.config.ts`:
+
+```typescript title="vite.config.ts"
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import reactScan from 'vite-plugin-react-scan';
+
+export default defineConfig({
+  plugins: [
+    react(),
+    reactScan({
+      enable: process.env.NODE_ENV === 'development',
+    }),
+  ],
+});
+```
+
+## Plugin Options
+
+<ParamField path="enable" type="boolean" default="process.env.NODE_ENV === 'development'">
+  Enable or disable the plugin.
+
+  ```typescript
+  reactScan({
+    enable: true,
+  })
+  ```
+</ParamField>
+
+<ParamField path="scanOptions" type="Options">
+  Custom React Scan options to pass to the `scan()` function.
+
+  See [Configuration Options](/api-reference/options) for all available options.
+
+  ```typescript
+  reactScan({
+    scanOptions: {
+      enabled: true,
+      showToolbar: true,
+      log: false,
+      animationSpeed: 'fast',
+    },
+  })
+  ```
+</ParamField>
+
+<ParamField path="debug" type="boolean" default="false">
+  Enable debug logging for the plugin.
+
+  ```typescript
+  reactScan({
+    debug: true,
+  })
+  ```
+
+  This will log:
+  - Plugin initialization
+  - File transformations
+  - Script injection
+  - Build events
+</ParamField>
+
+<ParamField path="autoDisplayNames" type="boolean" default="false">
+  Automatically add display names to React components.
+
+  ```typescript
+  reactScan({
+    autoDisplayNames: true,
+  })
+  ```
+
+  This helps with component identification in the React Scan UI.
+
+  <Info>
+    Enabling this option will add Babel transformations to your build process, which may increase build time slightly.
+  </Info>
+</ParamField>
+
+## How It Works
+
+### Development Mode
+
+In development, the plugin:
+1. Excludes `react-scan` from Vite's dependency optimization
+2. Injects a script tag that imports and initializes React Scan
+3. Optionally transforms JSX files to add component display names
+
+Example injected script:
+```html
+<script type="module">
+  import { scan } from '/@id/react-scan';
+  (async () => {
+    try {
+      scan({ enabled: true });
+    } catch (error) {
+      console.error('[vite-plugin-react-scan] Scan failed:', error);
+    }
+  })();
+</script>
+```
+
+### Production Mode
+
+In production builds, the plugin:
+1. Bundles `react-scan` as a static asset
+2. Injects the script at the beginning of your HTML
+3. Initializes React Scan with your configured options
+
+<Warning>
+  React Scan is disabled by default in production. Only use `dangerouslyForceRunInProduction` for debugging purposes.
+</Warning>
+
+## Configuration Examples
+
+### Basic Setup
+
+```typescript title="vite.config.ts"
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import reactScan from 'vite-plugin-react-scan';
+
+export default defineConfig({
+  plugins: [
+    react(),
+    reactScan(),
+  ],
+});
+```
+
+### Custom Options
+
+```typescript title="vite.config.ts"
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import reactScan from 'vite-plugin-react-scan';
+
+export default defineConfig({
+  plugins: [
+    react(),
+    reactScan({
+      enable: process.env.NODE_ENV === 'development',
+      scanOptions: {
+        enabled: true,
+        showToolbar: true,
+        log: false,
+        animationSpeed: 'fast',
+        trackUnnecessaryRenders: true,
+      },
+    }),
+  ],
+});
+```
+
+### With Display Names
+
+```typescript title="vite.config.ts"
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import reactScan from 'vite-plugin-react-scan';
+
+export default defineConfig({
+  plugins: [
+    react(),
+    reactScan({
+      autoDisplayNames: true,
+    }),
+  ],
+});
+```
+
+### Environment-Based Configuration
+
+```typescript title="vite.config.ts"
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import reactScan from 'vite-plugin-react-scan';
+
+export default defineConfig(({ mode }) => ({
+  plugins: [
+    react(),
+    reactScan({
+      enable: mode === 'development',
+      scanOptions: {
+        log: mode === 'development' && process.env.VERBOSE === 'true',
+        trackUnnecessaryRenders: process.env.TRACK_RENDERS === 'true',
+      },
+    }),
+  ],
+}));
+```
+
+### Debug Mode
+
+```typescript title="vite.config.ts"
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import reactScan from 'vite-plugin-react-scan';
+
+export default defineConfig({
+  plugins: [
+    react(),
+    reactScan({
+      debug: true,
+      scanOptions: {
+        _debug: 'verbose',
+      },
+    }),
+  ],
+});
+```
+
+## Troubleshooting
+
+### React Scan not appearing
+
+1. Verify the plugin is loaded:
+   ```typescript
+   // vite.config.ts should have:
+   plugins: [react(), reactScan()]
+   ```
+
+2. Check browser console for errors
+
+3. Enable debug mode:
+   ```typescript
+   reactScan({ debug: true })
+   ```
+
+### Plugin conflicts
+
+Ensure `react()` plugin comes before `reactScan()`:
+
+```typescript
+plugins: [
+  react(),      // ✅ First
+  reactScan(),  // ✅ Second
+]
+```
+
+### Build errors
+
+If you encounter build errors with `autoDisplayNames`:
+
+```typescript
+reactScan({
+  autoDisplayNames: false, // Disable this option
+})
+```
+
+## See Also
+
+- [Configuration Options](/api-reference/options)
+- [CLI](/api-reference/cli-init)
+- [Webpack Plugin](/api-reference/webpack-plugin)
+- [Build Tools](/api-reference/build-tools)

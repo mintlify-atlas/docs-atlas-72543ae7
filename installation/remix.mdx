@@ -1,0 +1,167 @@
+---
+title: Remix
+description: Install React Scan in Remix projects
+---
+
+Install React Scan in your Remix project using either a script tag or module import.
+
+<Note>
+  Some features only work with React 19. Make sure your project is using a compatible React version.
+</Note>
+
+## Script Tag Method
+
+<Steps>
+  <Step title="Open your root file">
+    Navigate to `app/root.tsx` (or `app/root.jsx`).
+  </Step>
+
+  <Step title="Add the script tag to your Layout">
+    Add the React Scan script to your `Layout` component:
+
+    ```tsx app/root.tsx
+    import {
+      Links,
+      Meta,
+      Scripts,
+      ScrollRestoration,
+    } from "@remix-run/react";
+
+    export function Layout({ children }: { children: React.ReactNode }) {
+      return (
+        <html lang="en">
+          <head>
+            {/* Must run before any of your scripts */}
+            <script
+              crossOrigin="anonymous"
+              src="//unpkg.com/react-scan/dist/auto.global.js"
+            />
+            <meta charSet="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <Meta />
+            <Links />
+          </head>
+          <body>
+            {children}
+            <ScrollRestoration />
+            <Scripts />
+          </body>
+        </html>
+      );
+    }
+    ```
+  </Step>
+</Steps>
+
+## Module Import Method
+
+<Steps>
+  <Step title="Install the package">
+    <CodeGroup>
+      ```bash npm
+      npm install -D react-scan
+      ```
+
+      ```bash pnpm
+      pnpm add -D react-scan
+      ```
+
+      ```bash yarn
+      yarn add -D react-scan
+      ```
+
+      ```bash bun
+      bun add -D react-scan
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Option 1: Add to app/root">
+    Import React Scan in your `app/root.tsx`:
+
+    ```tsx app/root.tsx
+    // Must be imported before Remix
+    import { scan } from "react-scan";
+    import {
+      Links,
+      Meta,
+      Outlet,
+      Scripts,
+      ScrollRestoration,
+    } from "@remix-run/react";
+    import { useEffect } from "react";
+
+    export function Layout({ children }) {
+      useEffect(() => {
+        // Make sure to run React Scan after hydration
+        scan({
+          enabled: true,
+        });
+      }, []);
+
+      return (
+        <html lang="en">
+          <head>
+            <meta charSet="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <Meta />
+            <Links />
+          </head>
+          <body>
+            {children}
+            <ScrollRestoration />
+            <Scripts />
+          </body>
+        </html>
+      );
+    }
+
+    export default function App() {
+      return <Outlet />;
+    }
+    ```
+
+    <Warning>
+      React Scan must be imported before React, React DOM, and Remix in your entire project.
+    </Warning>
+  </Step>
+
+  <Step title="Option 2: Add to entry.client">
+    Alternatively, add to `app/entry.client.tsx`:
+
+    ```tsx app/entry.client.tsx
+    import { RemixBrowser } from "@remix-run/react";
+    import { StrictMode } from "react";
+    import { hydrateRoot } from "react-dom/client";
+    import { scan } from "react-scan";
+
+    scan({
+      enabled: true,
+    });
+
+    hydrateRoot(
+      document,
+      <StrictMode>
+        <RemixBrowser />
+      </StrictMode>
+    );
+    ```
+
+    <Note>
+      This approach only works with React 19.
+    </Note>
+  </Step>
+</Steps>
+
+## Running in Production
+
+By default, React Scan only runs in development. To enable it in production:
+
+```diff
+- import { scan } from "react-scan";
++ import { scan } from "react-scan/all-environments";
+```
+
+<Warning>
+  Running React Scan in production is not recommended as it may impact performance.
+</Warning>

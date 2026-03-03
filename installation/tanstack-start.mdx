@@ -1,0 +1,141 @@
+---
+title: TanStack Start
+description: Install React Scan in TanStack Start projects
+---
+
+Install React Scan in your TanStack Start project using either a script tag or module import.
+
+<Note>
+  Some features only work with React 19. Make sure your project is using a compatible React version.
+</Note>
+
+## Script Tag Method
+
+<Steps>
+  <Step title="Open your root route">
+    Navigate to `app/routes/__root.tsx` (or `app/routes/__root.jsx`).
+  </Step>
+
+  <Step title="Add the script tag to RootDocument">
+    Add the React Scan script to your `RootDocument` component:
+
+    ```tsx app/routes/__root.tsx
+    import { Meta, Scripts } from "@tanstack/start";
+
+    function RootDocument({ children }) {
+      return (
+        <html>
+          <head>
+            <script
+              crossOrigin="anonymous"
+              src="//unpkg.com/react-scan/dist/auto.global.js"
+            />
+            <Meta />
+          </head>
+          <body>
+            {children}
+            <Scripts />
+          </body>
+        </html>
+      );
+    }
+    ```
+  </Step>
+</Steps>
+
+## Module Import Method
+
+<Steps>
+  <Step title="Install the package">
+    <CodeGroup>
+      ```bash npm
+      npm install -D react-scan
+      ```
+
+      ```bash pnpm
+      pnpm add -D react-scan
+      ```
+
+      ```bash yarn
+      yarn add -D react-scan
+      ```
+
+      ```bash bun
+      bun add -D react-scan
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Option 1: Add to RootDocument">
+    Import React Scan in your `app/routes/__root.tsx`:
+
+    ```tsx app/routes/__root.tsx
+    // react-scan must be imported before React and TanStack Start
+    import { scan } from "react-scan";
+    import { Meta, Scripts } from "@tanstack/start";
+    import { useEffect } from "react";
+
+    function RootDocument({ children }) {
+      useEffect(() => {
+        // Make sure to run this only after hydration
+        scan({
+          enabled: true,
+        });
+      }, []);
+
+      return (
+        <html>
+          <head>
+            <Meta />
+          </head>
+          <body>
+            {children}
+            <Scripts />
+          </body>
+        </html>
+      );
+    }
+    ```
+
+    <Warning>
+      React Scan must be imported before React and TanStack Start.
+    </Warning>
+  </Step>
+
+  <Step title="Option 2: Add to app/client">
+    Alternatively, add to `app/client.tsx`:
+
+    ```tsx app/client.tsx
+    // must be imported before React and React DOM
+    import { scan } from "react-scan";
+    import { hydrateRoot } from "react-dom/client";
+    import { StartClient } from "@tanstack/start";
+    import { createRouter } from "./router";
+
+    scan({
+      enabled: true,
+    });
+
+    const router = createRouter();
+
+    hydrateRoot(document, <StartClient router={router} />);
+    ```
+
+    <Note>
+      This approach only works with React 19.
+    </Note>
+  </Step>
+</Steps>
+
+## Running in Production
+
+By default, React Scan only runs in development. To enable it in production:
+
+```diff
+- import { scan } from "react-scan";
++ import { scan } from "react-scan/all-environments";
+```
+
+<Warning>
+  Running React Scan in production is not recommended as it may impact performance.
+</Warning>

@@ -1,0 +1,432 @@
+---
+title: 'Build Tool Integrations'
+description: 'Integrate React Scan with esbuild, Rollup, Rspack, Rolldown, and Astro'
+---
+
+## Overview
+
+React Scan provides component name plugins for various build tools through the unplugin interface. These plugins automatically add display names to React components for better debugging.
+
+## esbuild
+
+### Installation
+
+```bash
+npm install react-scan
+```
+
+### Usage
+
+```javascript title="build.js"
+const esbuild = require('esbuild');
+const reactComponentNamePlugin = require('react-scan/react-component-name/esbuild');
+
+esbuild.build({
+  entryPoints: ['src/index.tsx'],
+  bundle: true,
+  outfile: 'dist/bundle.js',
+  plugins: [reactComponentNamePlugin.default()],
+}).catch(() => process.exit(1));
+```
+
+### With Options
+
+```javascript
+const reactComponentNamePlugin = require('react-scan/react-component-name/esbuild');
+
+esbuild.build({
+  plugins: [
+    reactComponentNamePlugin.default({
+      include: '**/*.{tsx,jsx}',
+      exclude: ['**/node_modules/**'],
+    }),
+  ],
+});
+```
+
+## Rollup
+
+### Installation
+
+```bash
+npm install react-scan
+```
+
+### Usage
+
+```javascript title="rollup.config.js"
+import reactComponentNamePlugin from 'react-scan/react-component-name/rollup';
+
+export default {
+  input: 'src/index.tsx',
+  output: {
+    file: 'dist/bundle.js',
+    format: 'esm',
+  },
+  plugins: [reactComponentNamePlugin()],
+};
+```
+
+### With Options
+
+```javascript
+import reactComponentNamePlugin from 'react-scan/react-component-name/rollup';
+
+export default {
+  plugins: [
+    reactComponentNamePlugin({
+      include: '**/*.{tsx,jsx}',
+      exclude: ['**/node_modules/**', '**/test/**'],
+      flags: {
+        noStyledComponents: true,
+      },
+    }),
+  ],
+};
+```
+
+## Rspack
+
+### Installation
+
+```bash
+npm install react-scan
+```
+
+### Usage
+
+```javascript title="rspack.config.js"
+const reactComponentNamePlugin = require('react-scan/react-component-name/rspack');
+
+module.exports = {
+  plugins: [reactComponentNamePlugin.default()],
+};
+```
+
+### With Options
+
+```javascript
+const reactComponentNamePlugin = require('react-scan/react-component-name/rspack');
+
+module.exports = {
+  plugins: [
+    reactComponentNamePlugin.default({
+      include: '**/*.{tsx,jsx}',
+      exclude: ['**/node_modules/**'],
+      enforce: 'post',
+    }),
+  ],
+};
+```
+
+## Rolldown
+
+### Installation
+
+```bash
+npm install react-scan
+```
+
+### Usage
+
+```javascript title="rolldown.config.js"
+import reactComponentNamePlugin from 'react-scan/react-component-name/rolldown';
+
+export default {
+  input: 'src/index.tsx',
+  plugins: [reactComponentNamePlugin()],
+};
+```
+
+### With Options
+
+```javascript
+import reactComponentNamePlugin from 'react-scan/react-component-name/rolldown';
+
+export default {
+  plugins: [
+    reactComponentNamePlugin({
+      include: '**/*.{tsx,jsx}',
+      exclude: ['**/node_modules/**'],
+    }),
+  ],
+};
+```
+
+## Astro
+
+### Installation
+
+```bash
+npm install react-scan
+```
+
+### Usage
+
+```javascript title="astro.config.mjs"
+import { defineConfig } from 'astro/config';
+import react from '@astrojs/react';
+import reactComponentNamePlugin from 'react-scan/react-component-name/astro';
+
+export default defineConfig({
+  integrations: [
+    react(),
+    reactComponentNamePlugin(),
+  ],
+});
+```
+
+### With Options
+
+```javascript
+import reactComponentNamePlugin from 'react-scan/react-component-name/astro';
+
+export default defineConfig({
+  integrations: [
+    react(),
+    reactComponentNamePlugin({
+      include: '**/*.{tsx,jsx}',
+      exclude: ['**/node_modules/**'],
+    }),
+  ],
+});
+```
+
+## Plugin Options
+
+All build tool plugins share the same options interface:
+
+<ParamField path="include" type="FilterPattern">
+  Files to include for transformation.
+
+  Default: `**/*.{mtsx,mjsx,tsx,jsx}`
+
+  ```javascript
+  {
+    include: '**/*.{tsx,jsx}'
+  }
+  ```
+</ParamField>
+
+<ParamField path="exclude" type="FilterPattern">
+  Files to exclude from transformation.
+
+  Default excludes:
+  - `**/node_modules/**`
+  - `**/_app.{jsx,tsx,js,ts}` (Next.js)
+  - `**/_document.{jsx,tsx,js,ts}` (Next.js)
+  - `**/api/**/*` (Next.js API routes)
+  - `**/.million/**/*` (Million.js)
+
+  ```javascript
+  {
+    exclude: ['**/node_modules/**', '**/dist/**']
+  }
+  ```
+</ParamField>
+
+<ParamField path="enforce" type="'pre' | 'post' | undefined" default="'post'">
+  Plugin enforcement order (Webpack/Rspack only).
+
+  ```javascript
+  {
+    enforce: 'post'
+  }
+  ```
+</ParamField>
+
+<ParamField path="flags" type="object">
+  Additional transformation flags.
+
+  ```typescript
+  interface Flags {
+    noTryCatchDisplayNames?: boolean;
+    noStyledComponents?: boolean;
+    noCreateContext?: boolean;
+    ignoreComponentSubstrings?: Array<string>;
+  }
+  ```
+
+  ```javascript
+  {
+    flags: {
+      noStyledComponents: true,
+      ignoreComponentSubstrings: ['Test', 'Mock'],
+    }
+  }
+  ```
+</ParamField>
+
+## Initializing React Scan
+
+After configuring the build tool plugin, initialize React Scan in your application:
+
+```typescript title="src/index.tsx"
+import { scan } from 'react-scan';
+
+if (process.env.NODE_ENV === 'development') {
+  scan({
+    enabled: true,
+    showToolbar: true,
+  });
+}
+```
+
+## Flag Details
+
+### noTryCatchDisplayNames
+
+Skip adding display names inside try-catch blocks.
+
+```javascript
+{
+  flags: {
+    noTryCatchDisplayNames: true
+  }
+}
+```
+
+### noStyledComponents
+
+Skip styled-components transformations.
+
+```javascript
+{
+  flags: {
+    noStyledComponents: true
+  }
+}
+```
+
+### noCreateContext
+
+Skip React.createContext transformations.
+
+```javascript
+{
+  flags: {
+    noCreateContext: true
+  }
+}
+```
+
+### ignoreComponentSubstrings
+
+Ignore components containing specific substrings.
+
+```javascript
+{
+  flags: {
+    ignoreComponentSubstrings: ['Test', 'Mock', 'Story']
+  }
+}
+```
+
+## Complete Examples
+
+### esbuild with React
+
+```javascript title="build.js"
+const esbuild = require('esbuild');
+const reactComponentNamePlugin = require('react-scan/react-component-name/esbuild');
+
+esbuild.build({
+  entryPoints: ['src/index.tsx'],
+  bundle: true,
+  outfile: 'dist/bundle.js',
+  loader: {
+    '.tsx': 'tsx',
+    '.ts': 'ts',
+  },
+  plugins: [
+    reactComponentNamePlugin.default({
+      include: '**/*.{tsx,jsx}',
+      flags: {
+        ignoreComponentSubstrings: ['Test'],
+      },
+    }),
+  ],
+}).catch(() => process.exit(1));
+```
+
+### Rollup with TypeScript
+
+```javascript title="rollup.config.js"
+import typescript from '@rollup/plugin-typescript';
+import reactComponentNamePlugin from 'react-scan/react-component-name/rollup';
+
+export default {
+  input: 'src/index.tsx',
+  output: {
+    file: 'dist/bundle.js',
+    format: 'esm',
+  },
+  plugins: [
+    typescript(),
+    reactComponentNamePlugin({
+      exclude: ['**/node_modules/**', '**/*.test.tsx'],
+    }),
+  ],
+};
+```
+
+### Astro with Multiple Frameworks
+
+```javascript title="astro.config.mjs"
+import { defineConfig } from 'astro/config';
+import react from '@astrojs/react';
+import vue from '@astrojs/vue';
+import reactComponentNamePlugin from 'react-scan/react-component-name/astro';
+
+export default defineConfig({
+  integrations: [
+    react(),
+    vue(),
+    reactComponentNamePlugin({
+      include: '**/*.{tsx,jsx}', // Only React files
+    }),
+  ],
+});
+```
+
+## Troubleshooting
+
+### Plugin not transforming files
+
+1. Check the `include`/`exclude` patterns
+2. Verify file extensions match the pattern
+3. Ensure plugin is loaded in correct order
+
+### Build performance issues
+
+Exclude unnecessary files:
+
+```javascript
+{
+  exclude: [
+    '**/node_modules/**',
+    '**/dist/**',
+    '**/*.test.{tsx,jsx}',
+    '**/*.stories.{tsx,jsx}',
+  ]
+}
+```
+
+### TypeScript errors
+
+Add type definitions:
+
+```typescript title="react-scan.d.ts"
+declare module 'react-scan/react-component-name/esbuild';
+declare module 'react-scan/react-component-name/rollup';
+declare module 'react-scan/react-component-name/rspack';
+declare module 'react-scan/react-component-name/rolldown';
+declare module 'react-scan/react-component-name/astro';
+```
+
+## See Also
+
+- [Configuration Options](/api-reference/options)
+- [Vite Plugin](/api-reference/vite-plugin)
+- [Webpack Plugin](/api-reference/webpack-plugin)
+- [CLI](/api-reference/cli-init)

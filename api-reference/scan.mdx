@@ -1,0 +1,101 @@
+---
+title: 'scan()'
+description: 'Initialize React Scan with configuration options'
+---
+
+## Overview
+
+The `scan()` function is the primary API for initializing React Scan. It starts the scanning process and applies the provided configuration options.
+
+## Signature
+
+```typescript
+scan(options?: Options): void
+```
+
+## Parameters
+
+<ParamField path="options" type="Options" default="{}">
+  Optional configuration object to customize React Scan behavior. See [Options](/api-reference/options) for all available settings.
+  
+  <Expandable title="Common Options">
+    <ParamField path="enabled" type="boolean" default="true">
+      Enable or disable scanning. Recommended: `process.env.NODE_ENV === 'development'`
+    </ParamField>
+    
+    <ParamField path="showToolbar" type="boolean" default="true">
+      Show or hide the React Scan toolbar
+    </ParamField>
+    
+    <ParamField path="log" type="boolean" default="false">
+      Log renders to the console. Warning: Can add significant overhead when the app re-renders frequently
+    </ParamField>
+    
+    <ParamField path="animationSpeed" type="'slow' | 'fast' | 'off'" default="'fast'">
+      Speed of render highlight animations
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Returns
+
+`void` - This function does not return a value.
+
+## Usage
+
+### Basic Usage
+
+```tsx
+import { scan } from 'react-scan';
+
+scan();
+```
+
+### With Options
+
+```tsx
+import { scan } from 'react-scan';
+
+scan({
+  enabled: true,
+  showToolbar: true,
+  log: false,
+});
+```
+
+### Development Only
+
+```tsx
+import { scan } from 'react-scan';
+
+scan({
+  enabled: process.env.NODE_ENV === 'development',
+});
+```
+
+### Force Production Mode
+
+```tsx
+import { scan } from 'react-scan';
+
+scan({
+  enabled: true,
+  dangerouslyForceRunInProduction: true,
+});
+```
+
+<Warning>
+  Using `dangerouslyForceRunInProduction` in production is not recommended as it can impact performance.
+</Warning>
+
+## Behavior
+
+- If `enabled` is `false` and `showToolbar` is not explicitly `true`, React Scan will not initialize
+- React Scan will not run inside iframes unless `allowInIframe` is set to `true`
+- By default, React Scan only runs in development mode. Use `dangerouslyForceRunInProduction` to override this behavior
+
+## See Also
+
+- [useScan()](/api-reference/use-scan) - React hook version of scan()
+- [setOptions()](/api-reference/set-options) - Update options at runtime
+- [Options](/api-reference/options) - Full options reference

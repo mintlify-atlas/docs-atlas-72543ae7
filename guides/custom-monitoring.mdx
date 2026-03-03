@@ -1,0 +1,486 @@
+---
+title: Custom Monitoring
+description: Using onRender hooks and custom monitoring with React Scan
+---
+
+React Scan provides powerful hooks and callbacks to monitor your React application's performance programmatically.
+
+## onRender Callback
+
+The `onRender` callback is triggered every time a component renders, giving you detailed information about the render.
+
+### Global onRender
+
+Monitor all component renders:
+
+```typescript
+import { scan } from 'react-scan';
+
+scan({
+  onRender: (fiber, renders) => {
+    const render = renders[0];
+    
+    console.log({
+      component: render.componentName,
+      phase: render.phase,      // mount, update, or unmount
+      time: render.time,        // render time in ms
+      changes: render.changes,  // what changed
+      fps: render.fps,          // current FPS
+    });
+  }
+});
+```
+
+From `packages/scan/src/core/index.ts:138-141`
+
+### Component-Specific onRender
+
+Monitor a specific component:
+
+```typescript
+import { onRender } from 'react-scan';
+import { MyComponent } from './MyComponent';
+
+onRender(MyComponent, (fiber, renders) => {
+  renders.forEach(render => {
+    console.log('MyComponent rendered:', {
+      time: render.time,
+      count: render.count,
+      changes: render.changes,
+    });
+  });
+});
+```
+
+From `packages/scan/src/core/index.ts:549-560`
+
+## Render Data Structure
+
+The `renders` array contains detailed information about each render:
+
+```typescript
+interface Render {
+  phase: RenderPhase;          // Mount (0b001), Update (0b010), or Unmount (0b100)
+  componentName: string | null; // Display name of component
+  time: number | null;         // Render time in milliseconds
+  count: number;               // Number of times rendered
+  forget: boolean;             // Whether using React Compiler
+  changes: Array<Change>;      // What triggered the render
+  unnecessary: boolean | null; // Whether render was unnecessary
+  didCommit: boolean;          // Whether changes committed to DOM
+  fps: number;                 // Current FPS
+}
+```
+
+From `packages/scan/src/core/instrumentation.ts:140-150`
+
+## Change Tracking
+
+### Understanding Changes
+
+The `changes` array tells you exactly what triggered a render:
+
+```typescript
+type Change = StateChange | PropsChange | ContextChange;
+
+// Props change
+type PropsChange = {
+  type: ChangeReason.Props;  // 0b001
+  name: string;              // prop name
+  value: unknown;            // new value
+  prevValue?: unknown;       // previous value
+  count?: number;            // times this prop changed
+};
+
+// State change (functional components)
+type FunctionalComponentStateChange = {
+  type: ChangeReason.FunctionalState; // 0b010
+  value: unknown;
+  prevValue?: unknown;
+  count?: number;
+  name: string;  // hook index
+};
+
+// Context change
+type ContextChange = {
+  type: ChangeReason.Context;  // 0b100
+  name: string;                // context name
+  value: unknown;
+  prevValue?: unknown;
+  count?: number;
+  contextType: number;         // unique context ID
+};
+```
+
+From `packages/scan/src/core/index.ts:169-201`
+
+### Example: Logging Prop Changes
+
+```typescript
+import { scan } from 'react-scan';
+
+scan({
+  onRender: (fiber, renders) => {
+    const render = renders[0];
+    
+    // Filter for prop changes
+    const propChanges = render.changes.filter(
+      change => change.type === 0b001 // ChangeReason.Props
+    );
+    
+    if (propChanges.length > 0) {
+      console.log(`${render.componentName} props changed:`, propChanges);
+    }
+  }
+});
+```
+
+## Commit Lifecycle Hooks
+
+Monitor the React commit phase:
+
+```typescript
+import { scan } from 'react-scan';
+
+scan({
+  onCommitStart: () => {
+    console.log('React commit starting');
+    // Track start time, initialize metrics, etc.
+  },
+  
+  onRender: (fiber, renders) => {
+    // Called for each component that rendered
+  },
+  
+  onCommitFinish: () => {
+    console.log('React commit finished');
+    // Calculate total commit time, send metrics, etc.
+  }
+});
+```
+
+From `packages/scan/src/core/index.ts:138-141`
+
+## Collecting Performance Metrics
+
+### Example: Performance Analytics
+
+```typescript
+import { scan } from 'react-scan';
+
+const metrics = {
+  totalRenders: 0,
+  slowRenders: new Map(),
+  componentTimes: new Map(),
+};
+
+scan({
+  onRender: (fiber, renders) => {
+    const render = renders[0];
+    const { componentName, time } = render;
+    
+    if (!componentName || time === null) return;
+    
+    // Track total renders
+    metrics.totalRenders++;
+    
+    // Track slow renders (> 16ms)
+    if (time > 16) {
+      const count = metrics.slowRenders.get(componentName) || 0;
+      metrics.slowRenders.set(componentName, count + 1);
+    }
+    
+    // Track cumulative time per component
+    const totalTime = metrics.componentTimes.get(componentName) || 0;
+    metrics.componentTimes.set(componentName, totalTime + time);
+  },
+  
+  onCommitFinish: () => {
+    // Send metrics to analytics service
+    if (metrics.totalRenders % 100 === 0) {
+      console.log('Performance Metrics:', {
+        totalRenders: metrics.totalRenders,
+        slowRenders: Object.fromEntries(metrics.slowRenders),
+        avgTimeByComponent: Array.from(metrics.componentTimes.entries())
+          .map(([name, time]) => [name, time / metrics.totalRenders]),
+      });
+    }
+  }
+});
+```
+
+### Example: Unnecessary Render Detection
+
+```typescript
+import { scan } from 'react-scan';
+
+const unnecessaryRenders = new Map();
+
+scan({
+  trackUnnecessaryRenders: true,  // Enable tracking
+  
+  onRender: (fiber, renders) => {
+    const render = renders[0];
+    
+    if (render.unnecessary && render.componentName) {
+      const count = unnecessaryRenders.get(render.componentName) || 0;
+      unnecessaryRenders.set(render.componentName, count + 1);
+      
+      console.warn(
+        `Unnecessary render in ${render.componentName}`,
+        'Changes:', render.changes
+      );
+    }
+  }
+});
+```
+
+From `packages/scan/src/core/index.ts:98-106`
+
+<Tip>
+**Performance Warning**: Enabling `trackUnnecessaryRenders` adds meaningful overhead. Only use it during development or targeted debugging sessions.
+</Tip>
+
+## Accessing Render Reports
+
+Get stored render data for components:
+
+```typescript
+import { getReport } from 'react-scan';
+import { MyComponent } from './MyComponent';
+
+// Get data for specific component
+const componentData = getReport(MyComponent);
+
+if (componentData) {
+  console.log({
+    count: componentData.count,           // Total renders
+    time: componentData.time,             // Total time spent
+    renders: componentData.renders,       // All render records
+    displayName: componentData.displayName,
+  });
+}
+
+// Get all render data
+const allReports = getReport();
+for (const [key, data] of allReports.entries()) {
+  console.log(`${data.displayName}: ${data.count} renders, ${data.time}ms`);
+}
+```
+
+From `packages/scan/src/core/index.ts:332-342`
+
+## Programmatic Control
+
+### Getting and Setting Options
+
+```typescript
+import { getOptions, setOptions } from 'react-scan';
+
+// Get current options
+const currentOptions = getOptions();
+console.log('Enabled:', currentOptions.value.enabled);
+
+// Update options at runtime
+setOptions({
+  enabled: false,        // Pause scanning
+  log: true,            // Enable console logging
+  animationSpeed: 'off' // Disable animations
+});
+
+// Re-enable later
+setOptions({ enabled: true });
+```
+
+From `packages/scan/src/core/index.ts:344-410` and `packages/scan/src/core/index.ts:412`
+
+### Available Options
+
+```typescript
+interface Options {
+  enabled?: boolean;                          // Enable/disable scanning
+  dangerouslyForceRunInProduction?: boolean;  // Force run in production
+  log?: boolean;                              // Log renders to console
+  showToolbar?: boolean;                      // Show toolbar
+  animationSpeed?: 'slow' | 'fast' | 'off';  // Animation speed
+  trackUnnecessaryRenders?: boolean;          // Track unnecessary renders
+  showFPS?: boolean;                          // Show FPS meter
+  showNotificationCount?: boolean;            // Show notification count
+  allowInIframe?: boolean;                    // Allow in iframes
+  _debug?: 'verbose' | false;                // Debug logging
+  
+  // Callbacks
+  onCommitStart?: () => void;
+  onRender?: (fiber: Fiber, renders: Array<Render>) => void;
+  onCommitFinish?: () => void;
+}
+```
+
+From `packages/scan/src/core/index.ts:55-141`
+
+## Integration Examples
+
+### Sending to Analytics Service
+
+```typescript
+import { scan } from 'react-scan';
+
+let renderBatch = [];
+
+scan({
+  onRender: (fiber, renders) => {
+    const render = renders[0];
+    
+    renderBatch.push({
+      component: render.componentName,
+      time: render.time,
+      timestamp: Date.now(),
+    });
+  },
+  
+  onCommitFinish: () => {
+    // Send batch every 50 renders
+    if (renderBatch.length >= 50) {
+      fetch('/api/analytics', {
+        method: 'POST',
+        body: JSON.stringify({
+          type: 'react-performance',
+          renders: renderBatch,
+        })
+      });
+      renderBatch = [];
+    }
+  }
+});
+```
+
+### Custom DevTools Panel
+
+```typescript
+import { scan, getReport } from 'react-scan';
+
+const devtools = {
+  renders: [],
+  slowComponents: new Set(),
+};
+
+scan({
+  onRender: (fiber, renders) => {
+    const render = renders[0];
+    
+    // Store for custom devtools
+    devtools.renders.push({
+      ...render,
+      timestamp: Date.now(),
+    });
+    
+    // Flag slow components
+    if (render.time && render.time > 16) {
+      devtools.slowComponents.add(render.componentName);
+    }
+    
+    // Keep only last 100 renders
+    if (devtools.renders.length > 100) {
+      devtools.renders.shift();
+    }
+    
+    // Update custom UI
+    window.postMessage({
+      type: 'REACT_SCAN_UPDATE',
+      data: devtools,
+    }, '*');
+  }
+});
+
+// Expose to devtools
+if (typeof window !== 'undefined') {
+  window.__REACT_SCAN_DEVTOOLS__ = {
+    getRenders: () => devtools.renders,
+    getSlowComponents: () => Array.from(devtools.slowComponents),
+    getReport,
+  };
+}
+```
+
+### Performance Budget Monitoring
+
+```typescript
+import { scan } from 'react-scan';
+
+const PERFORMANCE_BUDGET = {
+  maxRenderTime: 16,      // 60fps threshold
+  maxRendersPerSecond: 30,
+};
+
+let rendersInLastSecond = [];
+
+scan({
+  onRender: (fiber, renders) => {
+    const render = renders[0];
+    const now = Date.now();
+    
+    // Track renders per second
+    rendersInLastSecond.push(now);
+    rendersInLastSecond = rendersInLastSecond.filter(
+      time => now - time < 1000
+    );
+    
+    // Check render time budget
+    if (render.time && render.time > PERFORMANCE_BUDGET.maxRenderTime) {
+      console.warn(
+        `⚠️ Slow render detected: ${render.componentName} took ${render.time}ms`,
+        'Budget:', PERFORMANCE_BUDGET.maxRenderTime + 'ms'
+      );
+    }
+    
+    // Check renders per second budget
+    if (rendersInLastSecond.length > PERFORMANCE_BUDGET.maxRendersPerSecond) {
+      console.warn(
+        `⚠️ Too many renders: ${rendersInLastSecond.length} renders/second`,
+        'Budget:', PERFORMANCE_BUDGET.maxRendersPerSecond
+      );
+    }
+  }
+});
+```
+
+## Console Logging
+
+Enable automatic console logging:
+
+```typescript
+import { scan } from 'react-scan';
+
+scan({
+  log: true  // Automatically log all renders to console
+});
+```
+
+From `packages/scan/src/core/index.ts:73-79`
+
+<Tip>
+**Warning**: Console logging can add significant overhead when the app re-renders frequently. Use it sparingly for debugging specific issues.
+</Tip>
+
+<Accordion title="How do I avoid performance overhead from monitoring?">
+To minimize overhead:
+1. Only enable tracking when needed
+2. Batch analytics data instead of sending on every render
+3. Use sampling (e.g., track only 10% of renders)
+4. Disable `trackUnnecessaryRenders` unless debugging
+5. Avoid expensive operations in callbacks
+</Accordion>
+
+<Accordion title="Can I use onRender in production?">
+Yes, but be careful:
+- Keep callbacks lightweight
+- Use sampling to reduce overhead
+- Consider using `dangerouslyForceRunInProduction` only for specific monitoring needs
+- See the [Production Usage guide](/guides/production-usage) for safety tips
+</Accordion>
+
+## Next Steps
+
+- Learn about [production usage](/guides/production-usage) and safety considerations
+- Understand [what causes renders](/guides/understanding-renders)
+- Explore [optimization techniques](/guides/optimizing-performance)

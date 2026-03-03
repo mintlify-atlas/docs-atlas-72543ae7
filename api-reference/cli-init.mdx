@@ -1,0 +1,245 @@
+---
+title: 'CLI: init'
+description: 'Automatically set up React Scan in your project'
+---
+
+## Overview
+
+The `react-scan init` command automatically detects your project setup and configures React Scan with the appropriate integration.
+
+```bash
+npx react-scan@latest init
+```
+
+## Supported Frameworks
+
+The CLI automatically detects and configures:
+
+- **Next.js** (App Router and Pages Router)
+- **Vite** (React + Vite projects)
+- **Webpack** (Create React App and custom Webpack configs)
+
+## Flags
+
+<ParamField path="-y, --yes" type="boolean" default="false">
+  Skip confirmation prompts.
+
+  Useful for CI/CD pipelines or automated setups.
+
+  ```bash
+  npx react-scan@latest init --yes
+  ```
+</ParamField>
+
+<ParamField path="-c, --cwd <cwd>" type="string" default="process.cwd()">
+  Specify the working directory.
+
+  ```bash
+  npx react-scan@latest init --cwd ./my-app
+  ```
+</ParamField>
+
+<ParamField path="--skip-install" type="boolean" default="false">
+  Skip package installation.
+
+  Useful if you want to review changes before installing dependencies.
+
+  ```bash
+  npx react-scan@latest init --skip-install
+  ```
+</ParamField>
+
+## Usage Examples
+
+### Basic Usage
+
+```bash
+npx react-scan@latest init
+```
+
+This will:
+1. Detect your project framework
+2. Show a preview of file changes
+3. Ask for confirmation
+4. Install `react-scan` package
+5. Apply configuration changes
+
+### Skip Prompts (CI/CD)
+
+```bash
+npx react-scan@latest init --yes
+```
+
+### Custom Directory
+
+```bash
+npx react-scan@latest init --cwd ./packages/web-app
+```
+
+### Review Changes Without Installing
+
+```bash
+npx react-scan@latest init --skip-install
+```
+
+Then install manually:
+```bash
+npm install react-scan
+# or
+pnpm add react-scan
+# or
+yarn add react-scan
+```
+
+## What It Does
+
+### Detection
+
+The CLI checks your `package.json` for:
+- Framework dependencies (Next.js, Vite, etc.)
+- Package manager lock files (package-lock.json, pnpm-lock.yaml, yarn.lock)
+- Build configuration files
+
+### Next.js Projects
+
+#### App Router
+
+Adds React Scan to your root layout:
+
+```tsx title="app/layout.tsx"
+import { scan } from 'react-scan';
+
+if (typeof window !== 'undefined') {
+  scan({
+    enabled: process.env.NODE_ENV === 'development',
+  });
+}
+```
+
+#### Pages Router
+
+Adds React Scan to `_app.tsx`:
+
+```tsx title="pages/_app.tsx"
+import { scan } from 'react-scan';
+
+if (typeof window !== 'undefined') {
+  scan({
+    enabled: process.env.NODE_ENV === 'development',
+  });
+}
+```
+
+### Vite Projects
+
+Adds the Vite plugin to `vite.config.ts`:
+
+```typescript title="vite.config.ts"
+import reactScan from 'vite-plugin-react-scan';
+
+export default {
+  plugins: [
+    reactScan({
+      enable: process.env.NODE_ENV === 'development',
+    }),
+  ],
+};
+```
+
+### Webpack Projects
+
+Configures Webpack (or suggests manual configuration for Create React App).
+
+## Output Example
+
+```bash
+$ npx react-scan@latest init
+
+[·] React Scan v0.5.3
+
+  Detecting project...
+
+  Framework:       Next.js
+  Router:          App Router
+  Package manager: pnpm
+
+File: app/layout.tsx
+────────────────────────────────────────────────────────
+  import type { Metadata } from "next";
+  import { Inter } from "next/font/google";
+  import "./globals.css";
++ import { scan } from 'react-scan';
++
++ if (typeof window !== 'undefined') {
++   scan({
++     enabled: process.env.NODE_ENV === 'development',
++   });
++ }
+
+  const inter = Inter({ subsets: ["latin"] });
+────────────────────────────────────────────────────────
+
+  Auto-detection may not be 100% accurate.
+  Please verify the changes before committing.
+
+✔ Apply these changes? … yes
+
+  Installing react-scan...
+
+  Running: pnpm add react-scan
+
+  Updated app/layout.tsx
+
+  Success! React Scan has been installed.
+  You may now start your development server.
+```
+
+## Error Handling
+
+### No package.json Found
+
+```bash
+No package.json found. Run this command from a project root.
+```
+
+**Solution:** Navigate to your project root directory.
+
+### Unsupported Framework
+
+```bash
+Could not detect a supported framework.
+React Scan supports Next.js, Vite, and Webpack projects.
+Visit https://github.com/aidenybai/react-scan#install for manual setup.
+```
+
+**Solution:** Follow the [manual installation guide](/installation/script-tag) for your framework.
+
+### Directory Does Not Exist
+
+```bash
+Directory does not exist: /path/to/directory
+```
+
+**Solution:** Check the path provided to `--cwd`.
+
+## Manual Setup
+
+If the CLI doesn't support your setup, see:
+
+- [Vite Plugin](/api-reference/vite-plugin)
+- [Webpack Plugin](/api-reference/webpack-plugin)
+- [Build Tools](/api-reference/build-tools)
+
+## Version
+
+Check the CLI version:
+
+```bash
+npx react-scan@latest --version
+```
+
+## See Also
+
+- [Installation Guide](/installation/script-tag)
+- [Configuration Options](/api-reference/options)
+- [Vite Plugin](/api-reference/vite-plugin)

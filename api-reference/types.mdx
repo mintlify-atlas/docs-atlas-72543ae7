@@ -1,0 +1,328 @@
+---
+title: 'Type Definitions'
+description: 'Core type definitions used throughout React Scan'
+---
+
+## Core Types
+
+### Fiber
+
+The `Fiber` type represents a React Fiber node. This is imported from the `bippy` package and provides access to React's internal fiber tree structure.
+
+```typescript
+import type { Fiber } from 'bippy';
+```
+
+Key properties include:
+- `type` - The component type
+- `memoizedState` - Component state
+- `memoizedProps` - Component props
+- `alternate` - Previous fiber version
+- `tag` - Fiber node type (FunctionComponent, ClassComponent, etc.)
+
+### Render
+
+Represents a single render event for a component.
+
+```typescript
+interface Render {
+  phase: RenderPhase;
+  componentName: string | null;
+  time: number | null;
+  count: number;
+  forget: boolean;
+  changes: Array<Change>;
+  unnecessary: boolean | null;
+  didCommit: boolean;
+  fps: number;
+}
+```
+
+<ParamField path="phase" type="RenderPhase">
+  The render phase (mount, update, or unmount).
+</ParamField>
+
+<ParamField path="componentName" type="string | null">
+  Display name of the component.
+</ParamField>
+
+<ParamField path="time" type="number | null">
+  Render time in milliseconds.
+</ParamField>
+
+<ParamField path="count" type="number">
+  Number of times rendered.
+</ParamField>
+
+<ParamField path="forget" type="boolean">
+  Whether the component uses React Forget (React Compiler) memoization.
+</ParamField>
+
+<ParamField path="changes" type="Array<Change>">
+  Array of detected changes (props, state, or context).
+</ParamField>
+
+<ParamField path="unnecessary" type="boolean | null">
+  Whether the render was unnecessary (when `trackUnnecessaryRenders` is enabled).
+</ParamField>
+
+<ParamField path="didCommit" type="boolean">
+  Whether the render resulted in a DOM commit.
+</ParamField>
+
+<ParamField path="fps" type="number">
+  Current frames per second when the render occurred.
+</ParamField>
+
+### RenderPhase
+
+Enumeration of React render phases.
+
+```typescript
+enum RenderPhase {
+  Mount = 0b001,
+  Update = 0b010,
+  Unmount = 0b100,
+}
+```
+
+## Change Types
+
+### Change
+
+Union type representing all possible change types.
+
+```typescript
+type Change = StateChange | PropsChange | ContextChange;
+```
+
+### StateChange
+
+Represents a state change in a component.
+
+```typescript
+type StateChange =
+  | FunctionalComponentStateChange
+  | ClassComponentStateChange;
+```
+
+#### FunctionalComponentStateChange
+
+```typescript
+interface FunctionalComponentStateChange {
+  type: ChangeReason.FunctionalState;
+  value: unknown;
+  prevValue?: unknown;
+  count?: number;
+  name: string;
+}
+```
+
+#### ClassComponentStateChange
+
+```typescript
+interface ClassComponentStateChange {
+  type: ChangeReason.ClassState;
+  value: unknown;
+  prevValue?: unknown;
+  count?: number;
+  name: 'state';
+}
+```
+
+### PropsChange
+
+Represents a prop change.
+
+```typescript
+interface PropsChange {
+  type: ChangeReason.Props;
+  name: string;
+  value: unknown;
+  prevValue?: unknown;
+  count?: number;
+}
+```
+
+### ContextChange
+
+Represents a context change.
+
+```typescript
+interface ContextChange {
+  type: ChangeReason.Context;
+  name: string;
+  value: unknown;
+  prevValue?: unknown;
+  count?: number;
+  contextType: number;
+}
+```
+
+### ChangeReason
+
+Enumeration of change reasons.
+
+```typescript
+enum ChangeReason {
+  Props = 0b001,
+  FunctionalState = 0b010,
+  ClassState = 0b011,
+  Context = 0b100,
+}
+```
+
+## Aggregated Types
+
+### AggregatedRender
+
+Aggregated render data for a component.
+
+```typescript
+interface AggregatedRender {
+  name: string;
+  frame: number | null;
+  phase: number;
+  time: number | null;
+  aggregatedCount: number;
+  forget: boolean;
+  changes: AggregatedChange;
+  unnecessary: boolean | null;
+  didCommit: boolean;
+  fps: number;
+  computedKey: OutlineKey | null;
+  computedCurrent: DOMRect | null;
+}
+```
+
+### AggregatedChange
+
+```typescript
+interface AggregatedChange {
+  type: number; // Bitwise union of ChangeReason
+  unstable: boolean;
+}
+```
+
+## Data Types
+
+### RenderData
+
+Tracking data for component renders.
+
+```typescript
+interface RenderData {
+  selfTime: number;
+  totalTime: number;
+  renderCount: number;
+  lastRenderTimestamp: number;
+}
+```
+
+### ChangesPayload
+
+Payload containing all types of changes.
+
+```typescript
+interface ChangesPayload {
+  propsChanges: Array<PropsChange>;
+  stateChanges: Array<FunctionalComponentStateChange | ClassComponentStateChange>;
+  contextChanges: Array<ContextChange>;
+}
+```
+
+### ChangesListener
+
+Callback type for listening to changes.
+
+```typescript
+type ChangesListener = (changes: ChangesPayload) => void;
+```
+
+## Store Types
+
+### StoreType
+
+Internal store structure.
+
+```typescript
+interface StoreType {
+  inspectState: Signal<States>;
+  wasDetailsOpen: Signal<boolean>;
+  lastReportTime: Signal<number>;
+  isInIframe: Signal<boolean>;
+  fiberRoots: WeakSet<Fiber>;
+  reportData: Map<number, RenderData>;
+  legacyReportData: Map<string, RenderData>;
+  changesListeners: Map<number, Array<ChangesListener>>;
+  interactionListeningForRenders: ((fiber: Fiber, renders: Array<Render>) => void) | null;
+}
+```
+
+## Utility Types
+
+### OutlineKey
+
+String key for identifying outlines.
+
+```typescript
+type OutlineKey = `${string}-${string}`;
+```
+
+### LocalStorageOptions
+
+Options that can be persisted to localStorage.
+
+```typescript
+type LocalStorageOptions = Omit<
+  Options,
+  'onCommitStart' | 'onRender' | 'onCommitFinish'
+>;
+```
+
+## Example Usage
+
+### Tracking Render Performance
+
+```typescript
+import { scan } from 'react-scan';
+import type { Fiber, Render } from 'react-scan';
+
+scan({
+  onRender: (fiber: Fiber, renders: Array<Render>) => {
+    const render = renders[0];
+    
+    if (render.time && render.time > 16) {
+      console.warn(`Slow render: ${render.componentName}`, {
+        time: render.time,
+        phase: render.phase,
+        changes: render.changes,
+        fps: render.fps,
+      });
+    }
+  },
+});
+```
+
+### Analyzing Changes
+
+```typescript
+import type { Change, ChangeReason } from 'react-scan';
+
+function analyzeChanges(changes: Array<Change>) {
+  const propChanges = changes.filter(c => c.type === ChangeReason.Props);
+  const stateChanges = changes.filter(
+    c => c.type === ChangeReason.FunctionalState || c.type === ChangeReason.ClassState
+  );
+  const contextChanges = changes.filter(c => c.type === ChangeReason.Context);
+  
+  console.log('Props changed:', propChanges.length);
+  console.log('State changed:', stateChanges.length);
+  console.log('Context changed:', contextChanges.length);
+}
+```
+
+## See Also
+
+- [Configuration Options](/api-reference/options) - All available configuration options
+- [CLI](/api-reference/cli-init) - Command-line interface

@@ -1,0 +1,433 @@
+---
+title: Render Detection
+description: How React Scan detects and visualizes component renders
+---
+
+React Scan automatically detects when React components render and highlights them with visual outlines. This helps you identify unnecessary re-renders and optimize your application's performance.
+
+## How It Works
+
+React Scan uses the [Bippy](https://github.com/aidenybai/bippy) library to instrument React's internal fiber tree, intercepting renders before they reach the DOM.
+
+### Instrumentation
+
+The detection system hooks into React's reconciliation process:
+
+```typescript
+// From instrumentation.ts
+export const createInstrumentation = (name: string, options: {
+  onCommitStart?: () => void;
+  onRender?: (fiber: Fiber, renders: Array<Render>) => void;
+  onCommitFinish?: () => void;
+  onActive?: () => void;
+  onError?: () => void;
+  isValidFiber?: (fiber: Fiber) => boolean;
+  trackChanges?: boolean;
+}) => {
+  // Instruments React to detect renders
+};
+```
+
+### Fiber Traversal
+
+When a component renders, React Scan:
+
+1. Detects the fiber node change
+2. Extracts component information (name, props, state)
+3. Finds nearest DOM elements
+4. Draws outlines around those elements
+
+```typescript
+// From new-outlines/index.ts
+export const outlineFiber = (fiber: Fiber) => {
+  if (!isCompositeFiber(fiber)) return;
+  
+  const name = typeof fiber.type === 'string' 
+    ? fiber.type 
+    : getDisplayName(fiber);
+  
+  if (!name) return;
+  
+  const nearestFibers = getNearestHostFibers(fiber);
+  const didCommit = didFiberCommit(fiber);
+  
+  blueprintMap.set(fiber, {
+    name,
+    count: 1,
+    elements: nearestFibers.map((fiber) => fiber.stateNode),
+    didCommit: didCommit ? 1 : 0,
+  });
+};
+```
+
+## Visual Highlights
+
+### Outline Colors
+
+Outlines use a purple color by default:
+
+```typescript
+const PRIMARY_COLOR = '115,97,230'; // RGB for purple
+```
+
+### Animation Behavior
+
+Outlines fade out over time using frame-based animation:
+
+```typescript
+// From canvas.ts
+const TOTAL_FRAMES = 45;
+const INTERPOLATION_SPEED = 0.2;
+const SNAP_THRESHOLD = 0.5;
+
+const lerp = (start: number, end: number) => {
+  const delta = end - start;
+  if (Math.abs(delta) < SNAP_THRESHOLD) return end;
+  return start + delta * INTERPOLATION_SPEED;
+};
+```
+
+Outlines:
+- Start at full opacity
+- Fade over 45 frames
+- Smoothly interpolate position changes
+- Snap to final position within 0.5px
+
+### Animation Speed
+
+Control animation speed with the `animationSpeed` option:
+
+```tsx
+import { scan } from 'react-scan';
+
+scan({
+  animationSpeed: 'fast', // 'fast' | 'slow' | 'off'
+});
+```
+
+<Note>
+The `animationSpeed` option is validated on initialization. Invalid values default to `'fast'`.
+</Note>
+
+## Render Counting
+
+Each outline displays a count of how many times components rendered:
+
+```typescript
+// Label format from canvas.ts
+function getLabelTextPart([count, names]: [number, string[]]): string {
+  let part = `${names.slice(0, MAX_PARTS_LENGTH).join(', ')} ×${count}`;
+  if (part.length > MAX_LABEL_LENGTH) {
+    part = `${part.slice(0, MAX_LABEL_LENGTH)}…`;
+  }
+  return part;
+}
+```
+
+Labels show:
+- Component names (up to 4 components)
+- Render count (e.g., `×3` for 3 renders)
+- Truncation with `…` for long names
+
+## Canvas Rendering
+
+### Offscreen Canvas
+
+React Scan uses OffscreenCanvas with Web Workers when available for better performance:
+
+```typescript
+const IS_OFFSCREEN_CANVAS_WORKER_SUPPORTED =
+  typeof OffscreenCanvas !== 'undefined' && typeof Worker !== 'undefined';
+
+if (IS_OFFSCREEN_CANVAS_WORKER_SUPPORTED && !window.__REACT_SCAN_EXTENSION__) {
+  worker = new Worker(
+    URL.createObjectURL(
+      new Blob([workerCode], { type: 'application/javascript' })
+    )
+  );
+  
+  const offscreenCanvas = canvasEl.transferControlToOffscreen();
+  worker.postMessage(
+    {
+      type: 'init',
+      canvas: offscreenCanvas,
+      width: canvasEl.width,
+      height: canvasEl.height,
+      dpr,
+    },
+    [offscreenCanvas]
+  );
+}
+```
+
+<Info>
+Offscreen Canvas moves rendering to a Web Worker, preventing main thread blocking during expensive drawing operations.
+</Info>
+
+### Fallback Rendering
+
+When OffscreenCanvas isn't available, rendering happens on the main thread:
+
+```typescript
+if (!worker) {
+  ctx = initCanvas(canvasEl, dpr) as CanvasRenderingContext2D;
+}
+```
+
+### Device Pixel Ratio
+
+The canvas adjusts for high-DPI displays:
+
+```typescript
+const getDpr = () => {
+  return Math.min(window.devicePixelRatio || 1, 2);
+};
+```
+
+<Warning>
+DPR is capped at 2 to balance quality and performance. Higher DPR values can significantly impact rendering performance.
+</Warning>
+
+## Viewport Optimization
+
+### Intersection Observer
+
+React Scan only draws elements visible in the viewport:
+
+```typescript
+export const getBatchedRectMap = async function* (
+  elements: Element[],
+): AsyncGenerator<IntersectionObserverEntry[], void, unknown> {
+  const state = {
+    uniqueElements: new Set(elements),
+    seenElements: new Set(),
+    resolveNext: null,
+    done: false,
+  };
+  
+  const observer = new IntersectionObserver(onIntersect.bind(state));
+  
+  for (const element of state.uniqueElements) {
+    observer.observe(element);
+  }
+  
+  while (!state.done) {
+    const entries = await new Promise((resolve) => {
+      state.resolveNext = resolve;
+    });
+    if (entries.length > 0) {
+      yield entries;
+    }
+  }
+};
+```
+
+This optimization:
+- Batches element rect calculations
+- Only processes visible elements
+- Avoids layout thrashing
+
+### Scroll Handling
+
+Outlines adjust during scroll with throttling:
+
+```typescript
+window.addEventListener('scroll', () => {
+  if (!isScrollScheduled) {
+    isScrollScheduled = true;
+    setTimeout(() => {
+      const { scrollX, scrollY } = window;
+      const deltaX = scrollX - prevScrollX;
+      const deltaY = scrollY - prevScrollY;
+      prevScrollX = scrollX;
+      prevScrollY = scrollY;
+      
+      updateScroll(activeOutlines, deltaX, deltaY);
+      isScrollScheduled = false;
+    }, 16 * 2); // ~32ms throttle
+  }
+});
+```
+
+## Filtering Renders
+
+### Ignore Specific Props
+
+You can ignore renders caused by specific prop changes:
+
+```tsx
+import { ignoreScan } from 'react-scan';
+
+function MyComponent({ data }) {
+  // This prop won't trigger render highlighting
+  const ignoredData = ignoreScan(data);
+  
+  return <div>{/* ... */}</div>;
+}
+```
+
+The `ignoreScan` function marks props to skip:
+
+```typescript
+export const ignoredProps = new WeakSet<
+  Exclude<ReactNode, undefined | null | string | number | boolean | bigint>
+>();
+
+export const ignoreScan = (node: ReactNode) => {
+  if (node && typeof node === 'object') {
+    ignoredProps.add(node);
+  }
+};
+```
+
+### Valid Fiber Check
+
+The instrumentation validates fibers before processing:
+
+```typescript
+export const isValidFiber = (fiber: Fiber) => {
+  if (ignoredProps.has(fiber.memoizedProps)) {
+    return false;
+  }
+  return true;
+};
+```
+
+## Tracking Changes
+
+React Scan detects what caused each render:
+
+### Props Changes
+
+```typescript
+const propsChanges: Array<PropsChange> = getChangedPropsDetailed(fiber)
+  .map((change) => ({
+    type: ChangeReason.Props,
+    name: change.name,
+    value: change.value,
+    prevValue: change.prevValue,
+    unstable: false,
+  }));
+```
+
+### State Changes
+
+```typescript
+export const getStateChanges = (fiber: Fiber): StateChange[] => {
+  const changes: StateChange[] = [];
+  
+  if (isFunctionComponent(fiber)) {
+    let memoizedState = fiber.memoizedState;
+    let prevState = fiber.alternate?.memoizedState;
+    let index = 0;
+    
+    while (memoizedState) {
+      if (memoizedState.queue && memoizedState.memoizedState !== undefined) {
+        const change = {
+          type: ChangeReason.FunctionalState,
+          name: index.toString(),
+          value: memoizedState.memoizedState,
+          prevValue: prevState?.memoizedState,
+        };
+        if (!isEqual(change.prevValue, change.value)) {
+          changes.push(change);
+        }
+      }
+      memoizedState = memoizedState.next;
+      prevState = prevState?.next;
+      index++;
+    }
+  }
+  
+  return changes;
+};
+```
+
+### Context Changes
+
+```typescript
+const contextChanges: Array<ContextChange> = fiberContext.map((info) => ({
+  name: info.name,
+  type: ChangeReason.Context,
+  value: info.value,
+  contextType: info.contextType,
+}));
+```
+
+## Performance Considerations
+
+### Render Batching
+
+Renders are batched and flushed every ~32ms:
+
+```typescript
+setInterval(() => {
+  if (blueprintMapKeys.size) {
+    requestAnimationFrame(flushOutlines);
+  }
+}, 16 * 2);
+```
+
+### Memory Management
+
+React Scan uses WeakMaps to avoid memory leaks:
+
+```typescript
+const blueprintMap = new Map<Fiber, BlueprintOutline>();
+const blueprintMapKeys = new Set<Fiber>();
+```
+
+After flushing, references are cleared:
+
+```typescript
+for (const fiber of blueprintMapKeys) {
+  blueprintMap.delete(fiber);
+  blueprintMapKeys.delete(fiber);
+}
+```
+
+## Configuration Options
+
+### Enable/Disable Scanning
+
+```tsx
+scan({
+  enabled: true, // Enable render detection
+});
+```
+
+### Console Logging
+
+Log renders to console for debugging:
+
+```tsx
+scan({
+  log: true, // Log all renders to console
+});
+```
+
+<Warning>
+Enabling `log: true` can add significant overhead when the app re-renders frequently.
+</Warning>
+
+### Production Mode
+
+By default, React Scan doesn't run in production builds:
+
+```tsx
+// Recommended pattern
+scan({
+  enabled: process.env.NODE_ENV === 'development',
+});
+
+// Force production use (not recommended)
+scan({
+  dangerouslyForceRunInProduction: true,
+});
+```
+
+## Related Features
+
+- [Toolbar](/features/toolbar) - Visual UI for controlling React Scan
+- [Performance Monitoring](/features/performance-monitoring) - Track render performance metrics
+- [Browser Extension](/features/browser-extension) - Use React Scan in any application

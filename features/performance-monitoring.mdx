@@ -1,0 +1,502 @@
+---
+title: Performance Monitoring
+description: Track and analyze React application performance with detailed metrics
+---
+
+React Scan provides comprehensive performance monitoring by tracking user interactions, render timings, and component-level metrics. This helps you identify bottlenecks and optimize your application.
+
+## Interaction Tracking
+
+React Scan monitors user interactions and measures their performance impact using the Event Timing API and custom instrumentation.
+
+### Supported Interactions
+
+Two types of interactions are tracked:
+
+**Pointer Interactions:**
+- Mouse clicks
+- Pointer up/down events
+- Input changes
+- Select changes
+
+**Keyboard Interactions:**
+- Key presses
+- Key down/up events
+- Input field changes
+
+```typescript
+// From performance.ts
+const getInteractionType = (
+  eventName: string,
+): 'pointer' | 'keyboard' | null => {
+  if (['pointerup', 'click'].includes(eventName)) {
+    return 'pointer';
+  }
+  if (['keydown', 'keyup'].includes(eventName)) {
+    return 'keyboard';
+  }
+  return null;
+};
+```
+
+### Interaction Lifecycle
+
+Each interaction goes through multiple stages:
+
+1. **Interaction Start** - User initiates action (click, keypress)
+2. **JS End** - JavaScript execution completes (microtask)
+3. **RAF Stage** - requestAnimationFrame callback fires
+4. **Timeout Stage** - setTimeout callback completes, rendering finishes
+
+```typescript
+type InteractionStartStage = {
+  kind: 'interaction-start';
+  interactionType: 'pointer' | 'keyboard';
+  interactionUUID: string;
+  blockingTimeStart: number;
+  componentPath: Array<string>;
+  componentName: string;
+  fiberRenders: FiberRenders;
+  stopListeningForRenders: () => void;
+};
+
+type JSEndStage = {
+  kind: 'js-end-stage';
+  jsEndDetail: number;
+};
+
+type RAFStage = {
+  kind: 'raf-stage';
+  rafStart: number;
+};
+
+type TimeoutStage = {
+  kind: 'timeout-stage';
+  commitEnd: number;
+  blockingTimeEnd: number;
+};
+```
+
+### Performance Entry Integration
+
+React Scan uses the browser's Event Timing API when available:
+
+```typescript
+const setupPerformanceListener = (
+  onEntry: (interaction: PerformanceInteraction) => void,
+) => {
+  const po = new PerformanceObserver((list) => {
+    const entries = list.getEntries();
+    for (let i = 0; i < entries.length; i++) {
+      processInteractionEntry(entries[i] as PerformanceInteractionEntry);
+    }
+  });
+
+  po.observe({
+    type: 'event',
+    buffered: true,
+    durationThreshold: 16, // Only track events >16ms
+  });
+  
+  po.observe({
+    type: 'first-input',
+    buffered: true,
+  });
+};
+```
+
+<Info>
+The 16ms threshold filters out fast interactions, focusing on potentially problematic ones.
+</Info>
+
+## Timing Breakdown
+
+Each interaction measures detailed timing phases:
+
+```typescript
+interface PerformanceInteraction {
+  id: string;
+  latency: number;                    // Total interaction latency
+  inputDelay: number;                 // Time before processing starts
+  processingDuration: number;         // JS execution time
+  presentationDelay: number;          // Time from processing to paint
+  startTime: number;
+  endTime: number;
+  processingStart: number;
+  processingEnd: number;
+  duration: number;
+  timestamp: number;
+  timeSinceTabInactive: number | 'never-hidden';
+  visibilityState: DocumentVisibilityState;
+  timeOrigin: number;
+}
+```
+
+### Latency Components
+
+**Input Delay:**
+```typescript
+inputDelay: entry.processingStart - entry.startTime
+```
+Time between user action and when browser starts processing it.
+
+**Processing Duration:**
+```typescript
+processingDuration: entry.processingEnd - entry.processingStart
+```
+Time spent executing JavaScript, including React renders.
+
+**Presentation Delay:**
+```typescript
+presentationDelay: entry.duration - (entry.processingEnd - entry.startTime)
+```
+Time from processing completion to visual update.
+
+## Component-Level Metrics
+
+### Render Tracking
+
+React Scan tracks which components rendered during each interaction:
+
+```typescript
+export const listenForRenders = (
+  fiberRenders: FiberRenders,
+) => {
+  const listener = (fiber: Fiber) => {
+    const displayName = getDisplayName(fiber.type);
+    if (!displayName) return;
+    
+    const existing = fiberRenders[displayName];
+    if (!existing) {
+      const { selfTime, totalTime } = getTimings(fiber);
+      
+      fiberRenders[displayName] = {
+        renderCount: 1,
+        hasMemoCache: hasMemoCache(fiber),
+        wasFiberRenderMount: wasFiberRenderMount(fiber),
+        parents: new Set(),
+        selfTime,
+        totalTime,
+        nodeInfo: [{
+          element: getHostFromFiber(fiber),
+          name: displayName,
+          selfTime,
+        }],
+        changes: collectInspectorDataWithoutCounts(fiber),
+      };
+    } else {
+      existing.renderCount += 1;
+      existing.selfTime += selfTime;
+      existing.totalTime += totalTime;
+    }
+  };
+  
+  Store.interactionListeningForRenders = listener;
+};
+```
+
+### Collected Metrics
+
+For each component:
+
+- **Render count** - How many times it rendered
+- **Self time** - Time spent in the component itself
+- **Total time** - Time including child components
+- **Mount status** - Whether this was a mount or update
+- **Memo cache** - Whether React Compiler optimizations apply
+- **Changes** - What props/state/context changed
+
+## FPS Tracking
+
+React Scan continuously monitors frame rate:
+
+```typescript
+let fps = 0;
+let lastTime = performance.now();
+let frameCount = 0;
+
+const updateFPS = () => {
+  frameCount++;
+  const now = performance.now();
+  if (now - lastTime >= 1000) {
+    fps = frameCount;
+    frameCount = 0;
+    lastTime = now;
+  }
+  requestAnimationFrame(updateFPS);
+};
+
+export const getFPS = () => {
+  if (!initedFps) {
+    initedFps = true;
+    updateFPS();
+    fps = 60; // Assume 60fps initially
+  }
+  return fps;
+};
+```
+
+FPS is updated every second and displayed in the toolbar when `showFPS: true`.
+
+## Slowdown Detection
+
+React Scan automatically detects performance slowdowns:
+
+### Interaction Events
+
+Slowdowns from user interactions:
+
+```typescript
+type InteractionEvent = {
+  kind: 'interaction';
+  data: {
+    startAt: number;
+    endAt: number;
+    meta: {
+      detailedTiming: TimeoutStage;
+      latency: number;
+      kind: PerformanceEntryChannelEvent['kind'];
+    };
+  };
+};
+```
+
+### Long Render Events
+
+Slowdowns from expensive renders:
+
+```typescript
+type LongRenderPipeline = {
+  kind: 'long-render';
+  data: {
+    startAt: number;
+    endAt: number;
+    meta: {
+      latency: number;
+      fiberRenders: FiberRenders;
+      fps: number;
+    };
+  };
+};
+```
+
+### Storage and Limits
+
+Slowdown events are stored in a bounded array:
+
+```typescript
+export const MAX_INTERACTION_TASKS = 25;
+let tasks = new BoundedArray<Task>(MAX_INTERACTION_TASKS);
+```
+
+Older events are removed when the limit is reached, keeping the most recent slowdowns.
+
+## Performance API Callbacks
+
+Hook into performance monitoring with callbacks:
+
+```tsx
+import { scan } from 'react-scan';
+
+scan({
+  onCommitStart: () => {
+    console.log('React commit phase starting');
+  },
+  
+  onRender: (fiber, renders) => {
+    console.log('Component rendered:', {
+      name: getDisplayName(fiber.type),
+      renders,
+    });
+  },
+  
+  onCommitFinish: () => {
+    console.log('React commit phase finished');
+  },
+});
+```
+
+### Render Object
+
+The `renders` parameter includes detailed information:
+
+```typescript
+interface Render {
+  phase: RenderPhase;              // Mount, Update, or Unmount
+  componentName: string | null;
+  time: number | null;             // Render time in ms
+  count: number;                   // Number of times rendered
+  forget: boolean;                 // React Compiler optimization
+  changes: Array<Change>;          // What changed
+  unnecessary: boolean | null;     // Was this render needed?
+  didCommit: boolean;              // Did changes reach the DOM?
+  fps: number;                     // Current FPS
+}
+
+enum RenderPhase {
+  Mount = 0b001,
+  Update = 0b010,
+  Unmount = 0b100,
+}
+```
+
+## Component Path Detection
+
+React Scan builds component hierarchy paths for better debugging:
+
+```typescript
+const getInteractionPath = (
+  initialFiber: Fiber | null,
+  filters: PathFilters = DEFAULT_PATH_FILTERS,
+): Array<string> => {
+  if (!initialFiber) return [];
+  
+  const stack = new Array<string>();
+  let fiber = initialFiber;
+  
+  while (fiber.return) {
+    const name = getCleanComponentName(fiber.type);
+    if (name && !isMinified(name) && shouldIncludeInPath(name, filters)) {
+      stack.push(name);
+    }
+    fiber = fiber.return;
+  }
+  
+  return stack.reverse();
+};
+```
+
+### Path Filtering
+
+Certain components are filtered from paths:
+
+```typescript
+const PATH_FILTER_PATTERNS = {
+  providers: [/Provider$/, /^Provider$/, /^Context$/],
+  hocs: [/^with[A-Z]/, /^forward(?:Ref)?$/i],
+  containers: [/^(?:App)?Container$/, /^Root$/],
+  utilities: [/^Fragment$/, /^Suspense$/, /^ErrorBoundary$/],
+  boundaries: [/^Boundary$/, /Boundary$/],
+};
+```
+
+This creates cleaner paths like `App > UserProfile > Avatar` instead of `App > Provider > withAuth(UserProfile) > Fragment > Avatar`.
+
+## Tab Visibility Handling
+
+React Scan tracks tab visibility to filter misleading metrics:
+
+```typescript
+let lastVisibilityHiddenAt: number | 'never-hidden' = 'never-hidden';
+
+const trackVisibilityChange = () => {
+  const onVisibilityChange = () => {
+    if (document.hidden) {
+      lastVisibilityHiddenAt = Date.now();
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
+};
+```
+
+Each interaction includes:
+```typescript
+timeSinceTabInactive: lastVisibilityHiddenAt === 'never-hidden'
+  ? 'never-hidden'
+  : Date.now() - lastVisibilityHiddenAt
+```
+
+<Warning>
+Slowdowns detected shortly after tab activation may be misleading, as the browser throttles background tabs.
+</Warning>
+
+## Report Generation
+
+Access performance reports programmatically:
+
+```tsx
+import { getReport } from 'react-scan';
+
+// Get report for specific component type
+const MyComponentReport = getReport(MyComponent);
+
+if (MyComponentReport) {
+  console.log({
+    count: MyComponentReport.count,     // Total renders
+    time: MyComponentReport.time,       // Total time (ms)
+    displayName: MyComponentReport.displayName,
+    changes: MyComponentReport.changes, // What caused renders
+  });
+}
+
+// Get all reports
+const allReports = getReport();
+for (const [key, data] of allReports.entries()) {
+  console.log(key, data);
+}
+```
+
+## Performance Store
+
+React Scan maintains an internal store for performance data:
+
+```typescript
+export const Store: StoreType = {
+  inspectState: signal({ kind: 'uninitialized' }),
+  fiberRoots: new Set<Fiber>(),
+  reportData: new Map<number, RenderData>(),
+  legacyReportData: new Map<string, RenderData>(),
+  lastReportTime: signal(0),
+  interactionListeningForRenders: null,
+  changesListeners: new Map(),
+};
+```
+
+Reports are updated on an interval:
+
+```typescript
+let needsReport = false;
+setInterval(() => {
+  if (needsReport) {
+    Store.lastReportTime.value = Date.now();
+    needsReport = false;
+  }
+}, 50); // Update every 50ms
+```
+
+## Best Practices
+
+1. **Monitor interaction latency** - Keep total latency under 100ms for good UX
+2. **Check FPS during scrolling** - Should maintain 60 FPS for smooth experience
+3. **Review component render counts** - High counts may indicate missing memoization
+4. **Analyze render timing** - Components taking >16ms block the main thread
+5. **Use callbacks for CI/CD** - Implement performance regression tests with `onRender`
+6. **Filter toolbar events** - Click on slowdown notifications to see detailed breakdowns
+
+## Configuration
+
+```tsx
+import { scan } from 'react-scan';
+
+scan({
+  // Enable performance monitoring
+  enabled: true,
+  
+  // Show FPS meter
+  showFPS: true,
+  
+  // Show slowdown notification count
+  showNotificationCount: true,
+  
+  // Callbacks for custom monitoring
+  onCommitStart: () => {},
+  onRender: (fiber, renders) => {},
+  onCommitFinish: () => {},
+});
+```
+
+## Related Features
+
+- [Toolbar](/features/toolbar) - Visual UI for viewing performance metrics
+- [Render Detection](/features/render-detection) - See what components are rendering
+- [Browser Extension](/features/browser-extension) - Monitor any React app

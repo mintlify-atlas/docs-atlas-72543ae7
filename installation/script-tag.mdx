@@ -1,0 +1,63 @@
+---
+title: Script Tag
+description: Install React Scan using a script tag in your HTML
+---
+
+The easiest way to add React Scan to any project is by including it as a script tag in your HTML.
+
+## Installation
+
+<Steps>
+  <Step title="Add the script tag">
+    Paste this script tag before any other scripts in your HTML file:
+
+    ```html
+    <script
+      crossOrigin="anonymous"
+      src="//unpkg.com/react-scan/dist/auto.global.js"
+    ></script>
+    ```
+  </Step>
+
+  <Step title="Verify it works">
+    Open your app in the browser. You should see the React Scan toolbar appear on the page.
+  </Step>
+</Steps>
+
+## Available CDN URLs
+
+You can use either of these CDN providers:
+
+### UNPKG
+
+```txt
+https://unpkg.com/react-scan/dist/auto.global.js
+```
+
+### JSDelivr
+
+```txt
+https://cdn.jsdelivr.net/npm/react-scan/dist/auto.global.js
+```
+
+## Example
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <script
+      crossOrigin="anonymous"
+      src="//unpkg.com/react-scan/dist/auto.global.js"
+    ></script>
+    <!-- rest of your scripts go under -->
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+```
+
+<Note>
+  React Scan only runs in development by default. It will not affect your production builds.
+</Note>

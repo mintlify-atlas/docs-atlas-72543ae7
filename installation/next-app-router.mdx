@@ -1,0 +1,97 @@
+---
+title: Next.js App Router
+description: Install React Scan in Next.js App Router projects
+---
+
+Install React Scan in your Next.js App Router project using either a script tag or module import.
+
+## Script Tag Method
+
+<Steps>
+  <Step title="Open your root layout">
+    Navigate to `app/layout.tsx` (or `app/layout.jsx`).
+  </Step>
+
+  <Step title="Add the Script component">
+    Import Next.js's `Script` component and add React Scan:
+
+    ```tsx app/layout.tsx
+    import Script from "next/script";
+
+    export default function RootLayout({ children }) {
+      return (
+        <html>
+          <head>
+            <Script
+              src="//unpkg.com/react-scan/dist/auto.global.js"
+              crossOrigin="anonymous"
+              strategy="beforeInteractive"
+            />
+          </head>
+          <body>{children}</body>
+        </html>
+      );
+    }
+    ```
+  </Step>
+</Steps>
+
+## Module Import Method
+
+<Steps>
+  <Step title="Create a ReactScan client component">
+    Create a new file for the React Scan component:
+
+    ```tsx components/react-scan.tsx
+    "use client";
+
+    import { scan } from "react-scan";
+    import { useEffect } from "react";
+
+    export function ReactScan() {
+      useEffect(() => {
+        scan({
+          enabled: true,
+        });
+      }, []);
+
+      return null;
+    }
+    ```
+
+    <Warning>
+      The `react-scan` import must come before React imports.
+    </Warning>
+  </Step>
+
+  <Step title="Add to your root layout">
+    Import the component at the top of `app/layout.tsx`:
+
+    ```tsx app/layout.tsx
+    // This component must be the top-most import in this file!
+    import { ReactScan } from "@/components/react-scan";
+
+    export default function RootLayout({ children }) {
+      return (
+        <html lang="en">
+          <ReactScan />
+          <body>{children}</body>
+        </html>
+      );
+    }
+    ```
+  </Step>
+</Steps>
+
+## Running in Production
+
+By default, React Scan only runs in development. To enable it in production:
+
+```diff
+- import { scan } from "react-scan";
++ import { scan } from "react-scan/all-environments";
+```
+
+<Warning>
+  Running React Scan in production is not recommended as it may impact performance.
+</Warning>

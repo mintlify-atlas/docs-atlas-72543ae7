@@ -1,0 +1,97 @@
+---
+title: Vite
+description: Install React Scan in Vite projects
+---
+
+Install React Scan in your Vite project using either a script tag or module import.
+
+## Script Tag Method
+
+<Steps>
+  <Step title="Open your index.html">
+    Navigate to your `index.html` file in the project root.
+  </Step>
+
+  <Step title="Add the script tag">
+    Add the React Scan script in the `<head>` section:
+
+    ```html index.html
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <script
+          crossOrigin="anonymous"
+          src="//unpkg.com/react-scan/dist/auto.global.js"
+        ></script>
+      </head>
+      <body>
+        <div id="root"></div>
+        <script type="module" src="/src/main.tsx"></script>
+      </body>
+    </html>
+    ```
+  </Step>
+</Steps>
+
+## Module Import Method
+
+<Steps>
+  <Step title="Install the package">
+    <CodeGroup>
+      ```bash npm
+      npm install -D react-scan
+      ```
+
+      ```bash pnpm
+      pnpm add -D react-scan
+      ```
+
+      ```bash yarn
+      yarn add -D react-scan
+      ```
+
+      ```bash bun
+      bun add -D react-scan
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Add to your entry point">
+    Import React Scan in your entry file (e.g., `src/main.tsx` or `src/index.tsx`):
+
+    ```tsx src/main.tsx
+    // must be imported before React and React DOM
+    import { scan } from "react-scan";
+    import React from "react";
+    import ReactDOM from "react-dom/client";
+    import App from "./App";
+
+    scan({
+      enabled: true,
+    });
+
+    ReactDOM.createRoot(document.getElementById("root")!).render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>
+    );
+    ```
+
+    <Warning>
+      React Scan must be imported before React and React DOM in your entire project, as it needs to hijack React DevTools before React gets to access it.
+    </Warning>
+  </Step>
+</Steps>
+
+## Running in Production
+
+By default, React Scan only runs in development. To enable it in production:
+
+```diff
+- import { scan } from "react-scan";
++ import { scan } from "react-scan/all-environments";
+```
+
+<Warning>
+  Running React Scan in production is not recommended as it may impact performance.
+</Warning>

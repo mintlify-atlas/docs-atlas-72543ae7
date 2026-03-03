@@ -1,0 +1,517 @@
+---
+title: Production Usage
+description: Production safety and the dangerouslyForceRunInProduction option
+---
+
+React Scan is designed primarily for development, but can be used in production with proper precautions.
+
+## Default Behavior
+
+By default, React Scan only runs in development builds:
+
+```typescript
+export const start = () => {
+  if (!IS_CLIENT) return;
+
+  if (
+    !ReactScanInternals.runInAllEnvironments &&
+    getIsProduction() &&
+    !ReactScanInternals.options.value.dangerouslyForceRunInProduction
+  ) {
+    return;  // Exit in production
+  }
+  
+  // Initialize scanning...
+};
+```
+
+From `packages/scan/src/core/index.ts:431-443`
+
+## Production Detection
+
+React Scan detects production builds by checking React's build type:
+
+```typescript
+export const getIsProduction = () => {
+  if (isProduction !== null) {
+    return isProduction;
+  }
+  
+  rdtHook ??= getRDTHook();
+  for (const renderer of rdtHook.renderers.values()) {
+    const buildType = detectReactBuildType(renderer);
+    if (buildType === 'production') {
+      isProduction = true;
+    }
+  }
+  
+  return isProduction;
+};
+```
+
+From `packages/scan/src/core/index.ts:417-429`
+
+## Force Running in Production
+
+<Tip>
+**Warning**: Running React Scan in production adds performance overhead and should only be done temporarily for debugging or monitoring specific issues.
+</Tip>
+
+### Using dangerouslyForceRunInProduction
+
+To enable React Scan in production:
+
+```typescript
+import { scan } from 'react-scan';
+
+scan({
+  dangerouslyForceRunInProduction: true,
+  
+  // Recommended: disable UI in production
+  showToolbar: false,
+  
+  // Use for monitoring only
+  onRender: (fiber, renders) => {
+    // Send metrics to monitoring service
+  }
+});
+```
+
+From `packages/scan/src/core/index.ts:66-71`
+
+### Safe Production Configuration
+
+When running in production, use minimal configuration:
+
+```typescript
+import { scan } from 'react-scan';
+
+// Only in production for specific debugging
+if (shouldMonitorPerformance()) {
+  scan({
+    dangerouslyForceRunInProduction: true,
+    
+    // Disable UI elements
+    showToolbar: false,
+    animationSpeed: 'off',
+    
+    // Disable expensive features
+    trackUnnecessaryRenders: false,
+    log: false,
+    
+    // Monitoring only
+    onRender: (fiber, renders) => {
+      const render = renders[0];
+      
+      // Only log slow renders
+      if (render.time && render.time > 50) {
+        analytics.track('slow-render', {
+          component: render.componentName,
+          time: render.time,
+        });
+      }
+    }
+  });
+}
+```
+
+## Performance Impact
+
+### Overhead Sources
+
+React Scan adds overhead through:
+
+1. **Fiber tree traversal** - Walking the React component tree
+2. **Change detection** - Comparing props, state, and context
+3. **DOM operations** - Rendering outlines and UI
+4. **Timing calculations** - Measuring render performance
+
+### Minimizing Overhead
+
+```typescript
+scan({
+  dangerouslyForceRunInProduction: true,
+  
+  // Disable UI rendering (biggest overhead)
+  showToolbar: false,
+  animationSpeed: 'off',
+  
+  // Disable expensive tracking
+  trackUnnecessaryRenders: false,  // Adds significant overhead
+  
+  // Use sampling to reduce callback frequency
+  onRender: (fiber, renders) => {
+    // Only track 10% of renders
+    if (Math.random() > 0.1) return;
+    
+    // Lightweight tracking only
+    trackMetric(renders[0].componentName, renders[0].time);
+  }
+});
+```
+
+## Conditional Loading
+
+### Environment-Based Loading
+
+Only load React Scan when needed:
+
+```typescript
+// During build time
+if (process.env.ENABLE_REACT_SCAN === 'true') {
+  import('react-scan').then(({ scan }) => {
+    scan({
+      dangerouslyForceRunInProduction: true,
+      showToolbar: false,
+    });
+  });
+}
+```
+
+### Feature Flag Loading
+
+```typescript
+// With feature flags
+if (featureFlags.isEnabled('react-scan')) {
+  import('react-scan').then(({ scan }) => {
+    scan({
+      dangerouslyForceRunInProduction: true,
+      showToolbar: false,
+      onRender: (fiber, renders) => {
+        // Send to monitoring service
+      }
+    });
+  });
+}
+```
+
+### User-Based Loading
+
+```typescript
+// Only for internal users or admins
+if (user.isInternal || user.isAdmin) {
+  import('react-scan').then(({ scan }) => {
+    scan({
+      dangerouslyForceRunInProduction: true,
+      showToolbar: true,  // OK for internal users
+    });
+  });
+}
+```
+
+## iframe Support
+
+By default, React Scan doesn't run in iframes:
+
+```typescript
+const isInIframe = Store.isInIframe.value;
+
+if (
+  isInIframe &&
+  !ReactScanInternals.options.value.allowInIframe &&
+  !ReactScanInternals.runInAllEnvironments
+) {
+  return;  // Don't run in iframe
+}
+```
+
+From `packages/scan/src/core/index.ts:527-535`
+
+To enable in iframes:
+
+```typescript
+scan({
+  allowInIframe: true
+});
+```
+
+From `packages/scan/src/core/index.ts:123-127`
+
+## Production Monitoring Examples
+
+### Real User Monitoring (RUM)
+
+```typescript
+import { scan } from 'react-scan';
+
+const SESSION_SAMPLE_RATE = 0.01; // Monitor 1% of sessions
+
+if (Math.random() < SESSION_SAMPLE_RATE) {
+  scan({
+    dangerouslyForceRunInProduction: true,
+    showToolbar: false,
+    animationSpeed: 'off',
+    trackUnnecessaryRenders: false,
+    
+    onRender: (fiber, renders) => {
+      const render = renders[0];
+      
+      // Track to analytics service
+      if (render.time && render.time > 16) {
+        window.analytics?.track('slow_component_render', {
+          component: render.componentName,
+          duration_ms: render.time,
+          user_id: getCurrentUserId(),
+          session_id: getSessionId(),
+          page: window.location.pathname,
+        });
+      }
+    }
+  });
+}
+```
+
+### Performance Budget Alerts
+
+```typescript
+import { scan } from 'react-scan';
+
+const ALERT_THRESHOLD_MS = 100;
+let alertsSent = new Set();
+
+scan({
+  dangerouslyForceRunInProduction: true,
+  showToolbar: false,
+  
+  onRender: (fiber, renders) => {
+    const render = renders[0];
+    
+    if (render.time && render.time > ALERT_THRESHOLD_MS) {
+      const key = render.componentName || 'unknown';
+      
+      // Only alert once per component per session
+      if (!alertsSent.has(key)) {
+        alertsSent.add(key);
+        
+        // Send to error tracking service
+        Sentry.captureMessage('Performance Budget Exceeded', {
+          level: 'warning',
+          extra: {
+            component: key,
+            renderTime: render.time,
+            threshold: ALERT_THRESHOLD_MS,
+            changes: render.changes,
+          }
+        });
+      }
+    }
+  }
+});
+```
+
+### Canary Deployments
+
+```typescript
+import { scan } from 'react-scan';
+
+// Only monitor canary deployment
+if (deploymentConfig.isCanary) {
+  scan({
+    dangerouslyForceRunInProduction: true,
+    showToolbar: false,
+    
+    onRender: (fiber, renders) => {
+      // Compare performance against baseline
+      const render = renders[0];
+      const baseline = performanceBaselines.get(render.componentName);
+      
+      if (baseline && render.time && render.time > baseline * 1.5) {
+        // Alert if 50% slower than baseline
+        metrics.increment('canary.performance.regression', {
+          component: render.componentName,
+          baseline_ms: baseline,
+          current_ms: render.time,
+        });
+      }
+    }
+  });
+}
+```
+
+## Security Considerations
+
+### Preventing Information Disclosure
+
+```typescript
+import { scan } from 'react-scan';
+
+scan({
+  dangerouslyForceRunInProduction: true,
+  showToolbar: false,  // Never show toolbar in production
+  
+  onRender: (fiber, renders) => {
+    const render = renders[0];
+    
+    // Sanitize component names to avoid leaking internal structure
+    const sanitizedName = sanitizeComponentName(render.componentName);
+    
+    // Don't send prop/state values, only metadata
+    trackMetric({
+      component: sanitizedName,
+      time: render.time,
+      changeCount: render.changes.length,
+      // Don't include: render.changes (may contain sensitive data)
+    });
+  }
+});
+
+function sanitizeComponentName(name: string | null): string {
+  if (!name) return 'Anonymous';
+  
+  // Remove file paths, internal prefixes, etc.
+  return name.replace(/^.*[\\/]/, '').replace(/\$\d+/, '');
+}
+```
+
+### Rate Limiting
+
+```typescript
+import { scan } from 'react-scan';
+
+class RateLimiter {
+  private calls: number[] = [];
+  
+  constructor(
+    private maxCalls: number,
+    private windowMs: number
+  ) {}
+  
+  tryCall(): boolean {
+    const now = Date.now();
+    this.calls = this.calls.filter(time => now - time < this.windowMs);
+    
+    if (this.calls.length < this.maxCalls) {
+      this.calls.push(now);
+      return true;
+    }
+    
+    return false;
+  }
+}
+
+const limiter = new RateLimiter(100, 60000); // 100 calls per minute
+
+scan({
+  dangerouslyForceRunInProduction: true,
+  showToolbar: false,
+  
+  onRender: (fiber, renders) => {
+    if (!limiter.tryCall()) return;
+    
+    // Send metric
+    trackRender(renders[0]);
+  }
+});
+```
+
+## Bundle Size Impact
+
+React Scan adds to your bundle size. For production:
+
+### Code Splitting
+
+```typescript
+// Don't import directly
+// import { scan } from 'react-scan'; ❌
+
+// Lazy load only when needed ✅
+if (shouldEnableMonitoring()) {
+  import(/* webpackChunkName: "react-scan" */ 'react-scan')
+    .then(({ scan }) => {
+      scan({
+        dangerouslyForceRunInProduction: true,
+        showToolbar: false,
+      });
+    });
+}
+```
+
+### Tree Shaking
+
+```typescript
+// Import only what you need
+import { scan, onRender } from 'react-scan';
+
+// Instead of
+import * as ReactScan from 'react-scan';
+```
+
+## Recommended Production Setup
+
+```typescript
+import type { Render } from 'react-scan';
+
+const ENABLE_MONITORING = 
+  process.env.ENABLE_REACT_SCAN === 'true' ||
+  window.location.search.includes('react-scan=1');
+
+if (ENABLE_MONITORING) {
+  import('react-scan').then(({ scan }) => {
+    const SAMPLE_RATE = 0.01; // 1% of sessions
+    const shouldSample = Math.random() < SAMPLE_RATE;
+    
+    scan({
+      dangerouslyForceRunInProduction: true,
+      
+      // UI disabled
+      showToolbar: false,
+      animationSpeed: 'off',
+      
+      // Expensive features disabled
+      trackUnnecessaryRenders: false,
+      log: false,
+      
+      // Lightweight monitoring
+      onRender: shouldSample ? (fiber, renders) => {
+        const render = renders[0];
+        
+        // Only track significant slowdowns
+        if (render.time && render.time > 50) {
+          window.analytics?.track('slow_render', {
+            component: render.componentName,
+            time: render.time,
+            page: window.location.pathname,
+          });
+        }
+      } : undefined
+    });
+  });
+}
+```
+
+<Accordion title="Should I use React Scan in production?">
+Generally, no. React Scan is designed for development. However, it can be useful in production for:
+- Debugging production-only issues
+- Monitoring canary deployments
+- Collecting real user performance data
+- Internal tools or admin panels
+
+Always use sampling, disable the UI, and monitor the performance impact.
+</Accordion>
+
+<Accordion title="What's the performance impact in production?">
+The impact depends on configuration:
+- **Minimal** (onRender only, no UI): ~1-3% overhead
+- **Moderate** (with change tracking): ~5-10% overhead
+- **High** (full UI + tracking): ~15-30% overhead
+
+Disable `showToolbar`, `animationSpeed`, and `trackUnnecessaryRenders` for minimal impact.
+</Accordion>
+
+<Accordion title="How do I enable React Scan only for specific users?">
+Use feature flags or environment variables:
+
+```typescript
+if (user.isInternal || featureFlags.has('react-scan')) {
+  import('react-scan').then(({ scan }) => {
+    scan({ dangerouslyForceRunInProduction: true });
+  });
+}
+```
+</Accordion>
+
+## Next Steps
+
+- Learn about [custom monitoring](/guides/custom-monitoring) and analytics integration
+- Understand [optimization techniques](/guides/optimizing-performance)
+- Read about [what causes renders](/guides/understanding-renders)

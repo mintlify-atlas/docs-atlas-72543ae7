@@ -1,0 +1,221 @@
+---
+title: 'Configuration Options'
+description: 'Complete reference for React Scan configuration options'
+---
+
+## Options Interface
+
+The `Options` interface allows you to customize React Scan's behavior. Pass these options to the `scan()` function or configure them via build tool plugins.
+
+```typescript
+import { scan } from 'react-scan';
+
+scan({
+  enabled: process.env.NODE_ENV === 'development',
+  showToolbar: true,
+  log: false,
+  // ... other options
+});
+```
+
+## Configuration Options
+
+<ParamField path="enabled" type="boolean" default="true">
+  Enable or disable scanning.
+
+  **Recommended usage:**
+  ```typescript
+  enabled: process.env.NODE_ENV === 'development'
+  ```
+
+  This ensures React Scan only runs in development mode.
+</ParamField>
+
+<ParamField path="dangerouslyForceRunInProduction" type="boolean" default="false">
+  Force React Scan to run in production.
+
+  <Warning>
+    Not recommended for production environments. This can add significant overhead to your application.
+  </Warning>
+</ParamField>
+
+<ParamField path="log" type="boolean" default="false">
+  Log renders to the console.
+
+  <Warning>
+    This can add significant overhead when the app re-renders frequently.
+  </Warning>
+
+  Example output:
+  ```
+  [React Scan] MyComponent rendered (23.4ms)
+  ```
+</ParamField>
+
+<ParamField path="showToolbar" type="boolean" default="true">
+  Show or hide the toolbar.
+
+  If you set this to `true` and set `enabled` to `false`, the toolbar will still show, but scanning will be disabled.
+
+  The toolbar provides:
+  - Real-time FPS monitoring
+  - Render count notifications
+  - Inspector controls
+</ParamField>
+
+<ParamField path="animationSpeed" type="'slow' | 'fast' | 'off'" default="'fast'">
+  Control the animation speed of render highlights.
+
+  - `'fast'` - Quick flash animations (recommended)
+  - `'slow'` - Slower, more visible animations
+  - `'off'` - No animations
+</ParamField>
+
+<ParamField path="trackUnnecessaryRenders" type="boolean" default="false">
+  Track unnecessary renders and mark their outlines gray when detected.
+
+  An unnecessary render is defined as a component re-rendering with no change to its corresponding DOM subtree.
+
+  <Warning>
+    Tracking unnecessary renders can add meaningful overhead to React Scan. Use this option sparingly during performance debugging sessions.
+  </Warning>
+</ParamField>
+
+<ParamField path="showFPS" type="boolean" default="true">
+  Show the FPS meter in the toolbar.
+
+  Displays real-time frames per second to help identify performance bottlenecks.
+</ParamField>
+
+<ParamField path="showNotificationCount" type="boolean" default="true">
+  Show the number of slowdown notifications in the toolbar.
+
+  Helps track how many performance issues have been detected during your session.
+</ParamField>
+
+<ParamField path="allowInIframe" type="boolean" default="false">
+  Allow React Scan to run inside iframes.
+
+  By default, React Scan is disabled in iframe contexts to avoid interference with embedded content.
+</ParamField>
+
+<ParamField path="_debug" type="'verbose' | false" default="false">
+  Enable verbose internal error logging.
+
+  Useful when React Scan is not behaving as expected and you want to provide information to maintainers when [submitting an issue](https://github.com/aidenybai/react-scan/issues).
+
+  Example:
+  ```typescript
+  scan({ _debug: 'verbose' });
+  ```
+</ParamField>
+
+## Lifecycle Hooks
+
+<ParamField path="onCommitStart" type="() => void">
+  Callback fired when a React commit phase starts.
+
+  ```typescript
+  scan({
+    onCommitStart: () => {
+      console.log('Commit started');
+    }
+  });
+  ```
+</ParamField>
+
+<ParamField path="onRender" type="(fiber: Fiber, renders: Array<Render>) => void">
+  Callback fired when a component renders.
+
+  Provides access to the fiber node and render information.
+
+  ```typescript
+  scan({
+    onRender: (fiber, renders) => {
+      console.log('Component:', fiber.type.name);
+      console.log('Renders:', renders);
+    }
+  });
+  ```
+
+  See [Types](/api-reference/types) for `Fiber` and `Render` type definitions.
+</ParamField>
+
+<ParamField path="onCommitFinish" type="() => void">
+  Callback fired when a React commit phase finishes.
+
+  ```typescript
+  scan({
+    onCommitFinish: () => {
+      console.log('Commit finished');
+    }
+  });
+  ```
+</ParamField>
+
+## Example Configurations
+
+### Basic Development Setup
+
+```typescript
+import { scan } from 'react-scan';
+
+scan({
+  enabled: process.env.NODE_ENV === 'development',
+  showToolbar: true,
+});
+```
+
+### Performance Debugging
+
+```typescript
+import { scan } from 'react-scan';
+
+scan({
+  enabled: true,
+  log: true,
+  trackUnnecessaryRenders: true,
+  animationSpeed: 'slow',
+  onRender: (fiber, renders) => {
+    const renderTime = renders[0]?.time;
+    if (renderTime && renderTime > 16) {
+      console.warn(`Slow render detected: ${fiber.type.name} (${renderTime}ms)`);
+    }
+  },
+});
+```
+
+### Minimal UI
+
+```typescript
+import { scan } from 'react-scan';
+
+scan({
+  enabled: true,
+  showToolbar: false,
+  showFPS: false,
+  showNotificationCount: false,
+  animationSpeed: 'off',
+});
+```
+
+## Local Storage
+
+React Scan persists certain options to localStorage for convenience:
+
+- `enabled`
+- `log`
+- `showToolbar`
+- `animationSpeed`
+- `showFPS`
+- `showNotificationCount`
+- `allowInIframe`
+- `trackUnnecessaryRenders`
+
+Lifecycle hooks (`onCommitStart`, `onRender`, `onCommitFinish`) are not persisted.
+
+## See Also
+
+- [Types](/api-reference/types) - Type definitions for Fiber, Render, and more
+- [CLI](/api-reference/cli-init) - Command-line interface
+- [Vite Plugin](/api-reference/vite-plugin) - Vite integration

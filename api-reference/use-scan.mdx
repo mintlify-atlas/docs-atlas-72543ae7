@@ -1,0 +1,130 @@
+---
+title: 'useScan()'
+description: 'React hook for initializing React Scan'
+---
+
+## Overview
+
+The `useScan()` hook is the React hook version of the [`scan()`](/api-reference/scan) function. It allows you to initialize React Scan within a React component.
+
+## Signature
+
+```typescript
+useScan(options?: Options): void
+```
+
+## Parameters
+
+<ParamField path="options" type="Options" default="{}">
+  Optional configuration object to customize React Scan behavior. See [Options](/api-reference/options) for all available settings.
+  
+  <Expandable title="Common Options">
+    <ParamField path="enabled" type="boolean" default="true">
+      Enable or disable scanning
+    </ParamField>
+    
+    <ParamField path="showToolbar" type="boolean" default="true">
+      Show or hide the React Scan toolbar
+    </ParamField>
+    
+    <ParamField path="log" type="boolean" default="false">
+      Log renders to the console
+    </ParamField>
+    
+    <ParamField path="animationSpeed" type="'slow' | 'fast' | 'off'" default="'fast'">
+      Speed of render highlight animations
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Returns
+
+`void` - This hook does not return a value.
+
+## Usage
+
+### Basic Usage
+
+```tsx
+import { useScan } from 'react-scan';
+
+function App() {
+  useScan();
+  
+  return <div>My App</div>;
+}
+```
+
+### With Options
+
+```tsx
+import { useScan } from 'react-scan';
+
+function App() {
+  useScan({
+    enabled: true,
+    showToolbar: true,
+    log: false,
+  });
+  
+  return <div>My App</div>;
+}
+```
+
+### Conditional Scanning
+
+```tsx
+import { useScan } from 'react-scan';
+
+function App() {
+  useScan({
+    enabled: process.env.NODE_ENV === 'development',
+  });
+  
+  return <div>My App</div>;
+}
+```
+
+### With Custom Callbacks
+
+```tsx
+import { useScan } from 'react-scan';
+
+function App() {
+  useScan({
+    enabled: true,
+    onCommitStart: () => {
+      console.log('Commit started');
+    },
+    onCommitFinish: () => {
+      console.log('Commit finished');
+    },
+  });
+  
+  return <div>My App</div>;
+}
+```
+
+## Comparison with scan()
+
+| Feature | `scan()` | `useScan()` |
+|---------|----------|-------------|
+| Usage context | Anywhere in JavaScript | Inside React components only |
+| Timing | Runs immediately when called | Runs during component mount |
+| Typical usage | Module-level initialization | Component-level initialization |
+
+<Note>
+  Both `scan()` and `useScan()` call the same underlying initialization logic. Choose based on your preferred initialization pattern.
+</Note>
+
+## Best Practices
+
+- Call `useScan()` in your root component (e.g., `App.tsx`) for consistent behavior
+- Don't call `useScan()` in multiple components - it only needs to be called once
+- Use the `enabled` option to control when scanning is active
+
+## See Also
+
+- [scan()](/api-reference/scan) - Imperative version of useScan()
+- [setOptions()](/api-reference/set-options) - Update options at runtime
+- [Options](/api-reference/options) - Full options reference

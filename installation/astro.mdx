@@ -1,0 +1,99 @@
+---
+title: Astro
+description: Install React Scan in Astro projects with React components
+---
+
+Install React Scan in your Astro project to monitor React components.
+
+## Script Tag Method
+
+<Steps>
+  <Step title="Open your root layout">
+    Navigate to your root layout file (usually `src/layouts/Layout.astro`).
+  </Step>
+
+  <Step title="Add the script tag">
+    Add the React Scan script with the `is:inline` directive:
+
+    ```astro src/layouts/Layout.astro
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <script
+          is:inline
+          crossOrigin="anonymous"
+          src="//unpkg.com/react-scan/dist/auto.global.js"
+        />
+        <!-- rest of your scripts go under -->
+      </head>
+      <body>
+        <slot />
+      </body>
+    </html>
+    ```
+
+    <Note>
+      The `is:inline` directive is important for Astro to load the script correctly.
+    </Note>
+  </Step>
+</Steps>
+
+## Module Import Method
+
+<Steps>
+  <Step title="Install the package">
+    <CodeGroup>
+      ```bash npm
+      npm install -D react-scan
+      ```
+
+      ```bash pnpm
+      pnpm add -D react-scan
+      ```
+
+      ```bash yarn
+      yarn add -D react-scan
+      ```
+
+      ```bash bun
+      bun add -D react-scan
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Add to your root layout">
+    Import React Scan in your layout:
+
+    ```astro src/layouts/Layout.astro
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <script>
+          import { scan } from 'react-scan';
+
+          scan({
+            enabled: true,
+          });
+        </script>
+        <!-- rest of your scripts go under -->
+      </head>
+      <body>
+        <slot />
+      </body>
+    </html>
+    ```
+  </Step>
+</Steps>
+
+## Running in Production
+
+By default, React Scan only runs in development. To enable it in production:
+
+```diff
+- import { scan } from "react-scan";
++ import { scan } from "react-scan/all-environments";
+```
+
+<Warning>
+  Running React Scan in production is not recommended as it may impact performance.
+</Warning>

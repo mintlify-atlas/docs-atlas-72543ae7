@@ -1,0 +1,433 @@
+---
+title: Browser Extension
+description: Use React Scan as a browser extension to debug any React application
+---
+
+The React Scan browser extension lets you analyze any React application without modifying its code. Install it once and use it across all your React projects.
+
+## Installation
+
+Install the React Scan extension from your browser's extension store:
+
+- [Chrome Web Store](https://chrome.google.com/webstore) - For Chrome, Edge, Brave, Arc
+- [Firefox Add-ons](https://addons.mozilla.org) - For Firefox
+- [Safari Extensions](https://apps.apple.com) - For Safari
+
+<Info>
+The extension works on any website running React, including production sites. However, performance monitoring may be limited on production builds.
+</Info>
+
+## How It Works
+
+The browser extension consists of three main components:
+
+### Background Script
+
+Manages extension state and script injection:
+
+```typescript
+// From background/index.ts
+import browser from 'webextension-polyfill';
+import { isInternalUrl } from '~utils/helpers';
+import { IconState, updateIconForTab } from './icon';
+
+const injectScripts = async (tabId: number) => {
+  await browser.scripting.executeScript({
+    target: { tabId },
+    files: ['src/content/index.js', 'src/inject/index.js'],
+  });
+  
+  await browser.tabs.sendMessage(tabId, {
+    type: 'react-scan:page-reload',
+  });
+};
+```
+
+The background script:
+- Injects React Scan into pages
+- Manages icon state (enabled/disabled)
+- Handles tab switches and page loads
+- Filters internal browser URLs
+
+### Content Script
+
+Runs in the page context and bridges the extension with the page:
+
+```typescript
+// Content script runs in isolated world
+// Communicates between extension and page
+browser.runtime.onMessage.addListener((message) => {
+  if (message.type === 'react-scan:toggle-state') {
+    // Toggle React Scan state
+  }
+});
+```
+
+### Injected Script
+
+Actual React Scan code injected into the page:
+
+```typescript
+// From inject/react-scan.ts
+import 'bippy'; // Instruments React
+
+// Extension detection
+window.__REACT_SCAN_EXTENSION__ = true;
+```
+
+## Extension Architecture
+
+### Script Injection Flow
+
+1. User navigates to a page
+2. Background script detects page load
+3. Checks if URL is valid (not internal browser page)
+4. Injects content script
+5. Content script injects React Scan into page
+6. React Scan initializes and starts monitoring
+
+```typescript
+const init = async (tab: browser.Tabs.Tab) => {
+  if (!tab.id || !tab.url || isInternalUrl(tab.url)) {
+    if (tab.id) {
+      await updateIconForTab(tab, IconState.DISABLED);
+    }
+    return;
+  }
+  
+  const isLoaded = await isScriptsLoaded(tab.id);
+  
+  if (!isLoaded) {
+    await injectScripts(tab.id);
+  }
+};
+```
+
+### Internal URL Filtering
+
+The extension skips internal browser pages:
+
+```typescript
+const isInternalUrl = (url: string): boolean => {
+  return (
+    url.startsWith('chrome://') ||
+    url.startsWith('chrome-extension://') ||
+    url.startsWith('about:') ||
+    url.startsWith('edge://') ||
+    url.startsWith('brave://') ||
+    url.startsWith('opera://')
+  );
+};
+```
+
+## Icon States
+
+The extension icon changes based on React Scan status:
+
+```typescript
+enum IconState {
+  ENABLED = 'enabled',   // Green - React Scan active
+  DISABLED = 'disabled', // Gray - React Scan inactive
+}
+
+const updateIconForTab = async (
+  tab: browser.Tabs.Tab,
+  state: IconState,
+) => {
+  // Update icon to reflect current state
+};
+```
+
+<Note>
+The icon only changes when React Scan successfully initializes on a page with React.
+</Note>
+
+## Toggling React Scan
+
+Click the extension icon to toggle React Scan:
+
+```typescript
+browserAction.onClicked.addListener(async (tab) => {
+  if (!tab.id || !tab.url || isInternalUrl(tab.url)) {
+    if (tab.id) {
+      await updateIconForTab(tab, IconState.DISABLED);
+    }
+    return;
+  }
+  
+  try {
+    await browser.tabs.sendMessage(tab.id, {
+      type: 'react-scan:toggle-state',
+    });
+    
+    await updateIconForTab(tab, IconState.DISABLED);
+  } catch {
+    await updateIconForTab(tab, IconState.DISABLED);
+  }
+});
+```
+
+## Tab Management
+
+The extension handles tab lifecycle events:
+
+### Tab Updates
+
+```typescript
+browser.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete') {
+    void init(tab);
+  }
+});
+```
+
+### Tab Activation
+
+```typescript
+browser.tabs.onActivated.addListener(async ({ tabId }) => {
+  const tab = await browser.tabs.get(tabId);
+  void init(tab);
+});
+```
+
+### Window Focus
+
+```typescript
+browser.windows.onFocusChanged.addListener(async (windowId) => {
+  if (windowId !== browser.windows.WINDOW_ID_NONE) {
+    const [tab] = await browser.tabs.query({ active: true, windowId });
+    if (tab) {
+      void init(tab);
+    }
+  }
+});
+```
+
+## Message Passing
+
+The extension uses message passing for communication:
+
+```typescript
+type BroadcastMessage = 
+  | { type: 'react-scan:is-enabled'; data: { state: boolean } }
+  | { type: 'react-scan:toggle-state' }
+  | { type: 'react-scan:page-reload' }
+  | { type: 'react-scan:ping' };
+
+browser.runtime.onMessage.addListener(
+  (message: BroadcastMessage, sender: browser.Runtime.MessageSender) => {
+    if (!sender.tab?.id) return;
+    
+    if (message.type === 'react-scan:is-enabled') {
+      void updateIconForTab(
+        sender.tab,
+        message.data?.state ? IconState.ENABLED : IconState.DISABLED,
+      );
+    }
+  },
+);
+```
+
+### Message Types
+
+- `react-scan:is-enabled` - Reports current React Scan state
+- `react-scan:toggle-state` - Toggle React Scan on/off
+- `react-scan:page-reload` - Page reloaded, reinitialize
+- `react-scan:ping` - Check if scripts are loaded
+
+## Extension Detection
+
+React Scan code can detect when running as an extension:
+
+```typescript
+if (window.__REACT_SCAN_EXTENSION__) {
+  // Running as browser extension
+  // Disable OffscreenCanvas worker (not supported in extensions)
+  // Use different rendering strategy
+}
+```
+
+This allows behavior customization:
+
+```typescript
+// From new-outlines/index.ts
+if (
+  IS_OFFSCREEN_CANVAS_WORKER_SUPPORTED &&
+  !window.__REACT_SCAN_EXTENSION__ // Skip worker in extension
+) {
+  worker = new Worker(...);
+}
+```
+
+<Warning>
+Web Workers with OffscreenCanvas don't work reliably in browser extensions, so React Scan falls back to main thread rendering.
+</Warning>
+
+## Version Reporting
+
+The extension reports its version:
+
+```typescript
+if (IS_CLIENT && window.__REACT_SCAN_EXTENSION__) {
+  window.__REACT_SCAN_VERSION__ = ReactScanInternals.version;
+}
+```
+
+This helps with:
+- Debugging version mismatches
+- Compatibility checks
+- Feature detection
+
+## Permissions
+
+The extension requires these permissions:
+
+```json
+{
+  "permissions": [
+    "activeTab",        // Access to current tab
+    "scripting",        // Script injection
+    "tabs",             // Tab management
+    "storage"           // Settings persistence
+  ],
+  "host_permissions": [
+    "<all_urls>"        // Access to all websites
+  ]
+}
+```
+
+<Info>
+`<all_urls>` permission is needed to inject React Scan into any page. The extension only activates on pages with React.
+</Info>
+
+## Settings Persistence
+
+Extension settings persist using browser.storage:
+
+```typescript
+// Settings are stored per-origin
+const key = `react-scan-options-${window.location.origin}`;
+
+browser.storage.local.set({
+  [key]: {
+    enabled: true,
+    showToolbar: true,
+    // ... other options
+  },
+});
+```
+
+Settings sync across:
+- Page reloads
+- Tab switches
+- Browser restarts
+
+## Script Loading Detection
+
+The extension checks if React Scan is already loaded:
+
+```typescript
+const isScriptsLoaded = async (tabId: number): Promise<boolean> => {
+  try {
+    await browser.tabs.sendMessage(tabId, { type: 'react-scan:ping' });
+    return true;
+  } catch {
+    return false;
+  }
+};
+```
+
+This prevents:
+- Double injection
+- Duplicate event listeners
+- Memory leaks
+
+## Error Handling
+
+The extension gracefully handles errors:
+
+```typescript
+try {
+  await browser.scripting.executeScript({
+    target: { tabId },
+    files: ['src/content/index.js', 'src/inject/index.js'],
+  });
+} catch (e) {
+  console.error('Script injection error:', e);
+  // Update icon to show disabled state
+}
+```
+
+Common errors:
+- Page doesn't allow script injection (CSP)
+- Internal browser page (chrome://, about:)
+- Extension permissions revoked
+- Tab closed before injection completes
+
+## Debugging the Extension
+
+### Enable Debug Mode
+
+```typescript
+import { scan } from 'react-scan';
+
+scan({
+  _debug: 'verbose', // Log internal errors
+});
+```
+
+### Check Console
+
+Look for React Scan logs:
+- `[React Scan] Invalid options` - Configuration errors
+- `[React Scan Internal Error]` - Runtime errors
+- `[React Scan] Failed to load` - Initialization failures
+
+### Inspect Extension
+
+1. Open browser extension management
+2. Enable "Developer mode"
+3. Click "Inspect" on React Scan extension
+4. Check console for background script errors
+
+## Limitations
+
+### Production Builds
+
+React production builds have limited debugging:
+- Component names may be minified
+- React DevTools hook may be unavailable
+- Performance metrics less detailed
+
+### Content Security Policy
+
+Strict CSP may block script injection:
+```
+Content-Security-Policy: script-src 'self'
+```
+
+The extension cannot inject into pages with restrictive CSP.
+
+### Cross-Origin Iframes
+
+By default, React Scan doesn't run in iframes:
+
+```typescript
+scan({
+  allowInIframe: true, // Enable for iframe support
+});
+```
+
+## Best Practices
+
+1. **Use on development builds** - More accurate results with source maps
+2. **Toggle on/off as needed** - Extension adds overhead, disable when not debugging
+3. **Check icon state** - Green means active, gray means inactive or no React detected
+4. **Review console warnings** - React Scan logs helpful debugging information
+5. **Update regularly** - Extension auto-updates with new features and fixes
+
+## Related Features
+
+- [Toolbar](/features/toolbar) - Extension UI and controls
+- [Render Detection](/features/render-detection) - How renders are detected
+- [Performance Monitoring](/features/performance-monitoring) - Metrics collected by extension

@@ -1,0 +1,261 @@
+---
+title: Understanding Renders
+description: Learn what causes renders and how React Scan detects them
+---
+
+React Scan helps you understand when and why your components re-render by automatically detecting and highlighting performance issues.
+
+## What Causes Renders?
+
+In React, components re-render when:
+
+1. **State Changes** - When a component's state updates
+2. **Props Changes** - When parent components pass new props
+3. **Context Changes** - When a context value updates
+4. **Parent Re-renders** - When a parent component re-renders
+
+### The Reference Problem
+
+React compares props by reference, not by value. This is intentional - rendering can be cheap to run. However, this makes it easy to accidentally cause unnecessary renders.
+
+```jsx
+// This will cause unnecessary renders on every parent render
+<ExpensiveComponent 
+  onClick={() => alert("hi")} 
+  style={{ color: "purple" }} 
+/>
+```
+
+Even though the `onClick` function and `style` object look the same, React creates new references on each render, triggering re-renders of `ExpensiveComponent`.
+
+## How React Scan Detects Renders
+
+React Scan uses React's internal instrumentation hooks to monitor your application in real-time.
+
+### Fiber Tree Traversal
+
+React Scan instruments React's reconciliation process by hooking into the fiber tree:
+
+```typescript
+instrument({
+  name: 'react-scan',
+  onCommitFiberRoot(rendererID, root) {
+    traverseRenderedFibers(
+      root.current,
+      (fiber, phase) => {
+        // Detect and track renders
+      }
+    );
+  }
+});
+```
+
+From `packages/scan/src/core/instrumentation.ts:524-528`
+
+### Render Phases
+
+React Scan tracks three render phases:
+
+- **Mount** (`0b001`) - Component rendering for the first time
+- **Update** (`0b010`) - Component re-rendering
+- **Unmount** (`0b100`) - Component being removed
+
+```typescript
+export enum RenderPhase {
+  Mount = 0b001,
+  Update = 0b010,
+  Unmount = 0b100,
+}
+```
+
+From `packages/scan/src/core/instrumentation.ts:37-41`
+
+### Change Detection
+
+For each render, React Scan collects detailed information about what changed:
+
+```typescript
+interface Render {
+  phase: RenderPhase;
+  componentName: string | null;
+  time: number | null;
+  count: number;
+  forget: boolean;  // React Compiler detection
+  changes: Array<Change>;
+  unnecessary: boolean | null;
+  didCommit: boolean;
+  fps: number;
+}
+```
+
+From `packages/scan/src/core/instrumentation.ts:140-150`
+
+## Tracking Changes
+
+### Props Changes
+
+React Scan detects when props change between renders:
+
+```typescript
+type PropsChange = {
+  type: ChangeReason.Props;
+  name: string;
+  value: unknown;
+  prevValue?: unknown;
+  count?: number | undefined;
+};
+```
+
+From `packages/scan/src/core/index.ts:187-193`
+
+### State Changes
+
+For functional components, React Scan tracks hook state:
+
+```typescript
+type FunctionalComponentStateChange = {
+  type: ChangeReason.FunctionalState;
+  value: unknown;
+  prevValue?: unknown;
+  count?: number | undefined;
+  name: string;
+};
+```
+
+From `packages/scan/src/core/index.ts:169-175`
+
+For class components:
+
+```typescript
+type ClassComponentStateChange = {
+  type: ChangeReason.ClassState;
+  value: unknown;
+  prevValue?: unknown;
+  count?: number | undefined;
+  name: 'state';
+};
+```
+
+From `packages/scan/src/core/index.ts:176-182`
+
+### Context Changes
+
+React Scan also tracks context value changes:
+
+```typescript
+type ContextChange = {
+  type: ChangeReason.Context;
+  name: string;
+  value: unknown;
+  prevValue?: unknown;
+  count?: number | undefined;
+  contextType: number;
+};
+```
+
+From `packages/scan/src/core/index.ts:194-201`
+
+## Detecting Unnecessary Renders
+
+An unnecessary render is defined as a component re-rendering with no change to its corresponding DOM subtree.
+
+```typescript
+export const isRenderUnnecessary = (fiber: Fiber) => {
+  if (!didFiberCommit(fiber)) return true;
+
+  const mutatedHostFibers = getMutatedHostFibers(fiber);
+  for (const mutatedHostFiber of mutatedHostFibers) {
+    // Check if props actually changed
+    const state = { isRequiredChange: false };
+    traverseProps(mutatedHostFiber, isRenderUnnecessaryTraversal.bind(state));
+    if (state.isRequiredChange) return false;
+  }
+  return true;
+};
+```
+
+From `packages/scan/src/core/instrumentation.ts:385-397`
+
+<Tip>
+Unnecessary render tracking can be enabled with the `trackUnnecessaryRenders` option, but be aware it adds meaningful overhead.
+</Tip>
+
+## Performance Metrics
+
+### Render Timing
+
+React Scan measures how long renders take:
+
+```typescript
+const { selfTime: fiberSelfTime, totalTime: fiberTotalTime } = getTimings(fiber);
+
+const render: Render = {
+  phase: RENDER_PHASE_STRING_TO_ENUM[phase],
+  componentName: getDisplayName(type),
+  count: 1,
+  changes,
+  time: fiberSelfTime,
+  forget: hasMemoCache(fiber),
+  unnecessary: TRACK_UNNECESSARY_RENDERS ? isRenderUnnecessary(fiber) : null,
+  didCommit: didFiberCommit(fiber),
+  fps,
+};
+```
+
+From `packages/scan/src/core/instrumentation.ts:607-625`
+
+### FPS Tracking
+
+React Scan monitors frames per second to detect performance degradation:
+
+```typescript
+let fps = 0;
+let lastTime = performance.now();
+let frameCount = 0;
+
+const updateFPS = () => {
+  frameCount++;
+  const now = performance.now();
+  if (now - lastTime >= 1000) {
+    fps = frameCount;
+    frameCount = 0;
+    lastTime = now;
+  }
+  requestAnimationFrame(updateFPS);
+};
+```
+
+From `packages/scan/src/core/instrumentation.ts:69-83`
+
+## Visual Feedback
+
+React Scan provides visual feedback through:
+
+- **Outlines** - Highlights components that render
+- **Color coding** - Different colors indicate render frequency
+- **Toolbar** - Shows FPS and notification count
+- **Inspector** - Detailed breakdown of what changed
+
+<Accordion title="How does the highlight color work?">
+The outline color intensity and animation speed are based on how frequently a component renders. More frequent renders result in brighter, faster animations.
+</Accordion>
+
+<Accordion title="Why don't I see all renders?">
+React Scan debounces renders within 16ms to avoid overwhelming the UI. Additionally, renders that don't commit to the DOM may not be highlighted.
+</Accordion>
+
+## React Compiler Detection
+
+React Scan automatically detects when components use React Compiler (formerly "React Forget"):
+
+```typescript
+forget: hasMemoCache(fiber)
+```
+
+Components using React Compiler are marked with a ✨ sparkle icon in the UI.
+
+## Next Steps
+
+- Learn how to [optimize performance issues](/guides/optimizing-performance)
+- Set up [custom monitoring](/guides/custom-monitoring)
+- Understand [production usage](/guides/production-usage)

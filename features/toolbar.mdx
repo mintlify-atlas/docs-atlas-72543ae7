@@ -1,0 +1,267 @@
+---
+title: Toolbar
+description: Interactive toolbar UI for monitoring and controlling React Scan
+---
+
+The React Scan toolbar provides a visual interface for monitoring application performance and controlling scanning behavior. It appears as a draggable widget in your browser when React Scan is enabled.
+
+## Overview
+
+The toolbar is implemented using Preact and renders within a Shadow DOM to avoid CSS conflicts with your application. It's initialized automatically when you call `scan()` with `showToolbar: true` (the default).
+
+<Info>
+The toolbar uses Shadow DOM isolation, so your application's styles won't interfere with its appearance.
+</Info>
+
+## Enabling/Disabling the Toolbar
+
+Control toolbar visibility through the `showToolbar` option:
+
+```tsx
+import { scan } from 'react-scan';
+
+scan({
+  enabled: true,
+  showToolbar: true, // Show the toolbar (default)
+});
+```
+
+You can enable scanning without the toolbar:
+
+```tsx
+scan({
+  enabled: true,
+  showToolbar: false, // Scan silently without UI
+});
+```
+
+<Warning>
+If you set `enabled: false` but `showToolbar: true`, the toolbar will display but scanning will be disabled.
+</Warning>
+
+## FPS Meter
+
+The toolbar includes a real-time FPS (frames per second) meter that helps you monitor rendering performance.
+
+### How it Works
+
+The FPS meter tracks frame rendering performance using `requestAnimationFrame`:
+
+```typescript
+// From instrumentation.ts
+let fps = 0;
+let lastTime = performance.now();
+let frameCount = 0;
+
+const updateFPS = () => {
+  frameCount++;
+  const now = performance.now();
+  if (now - lastTime >= 1000) {
+    fps = frameCount;
+    frameCount = 0;
+    lastTime = now;
+  }
+  requestAnimationFrame(updateFPS);
+};
+```
+
+The meter updates every second, showing the average frames rendered in the last 1000ms.
+
+### Configuration
+
+Control FPS meter visibility:
+
+```tsx
+scan({
+  showFPS: true, // Show FPS meter (default)
+});
+
+// Hide FPS meter but keep toolbar
+scan({
+  showToolbar: true,
+  showFPS: false,
+});
+```
+
+<Info>
+The FPS counter helps identify performance bottlenecks. A consistent 60 FPS indicates smooth rendering, while drops suggest optimization opportunities.
+</Info>
+
+## Notification Count
+
+The toolbar displays a count of performance slowdown notifications detected during interactions.
+
+### Slowdown Detection
+
+React Scan tracks user interactions (clicks, keypresses) and measures their latency:
+
+- Pointer interactions (clicks, pointer events)
+- Keyboard interactions (keypresses, input changes)
+- Performance entries from the browser's Event Timing API
+
+### Configuration
+
+```tsx
+scan({
+  showNotificationCount: true, // Show notification badge (default)
+});
+
+// Hide notification count
+scan({
+  showNotificationCount: false,
+});
+```
+
+### Notification Storage
+
+Notifications are stored in a bounded array with a maximum of 25 interactions:
+
+```typescript
+// From performance.ts
+export const MAX_INTERACTION_TASKS = 25;
+```
+
+Older notifications are automatically removed when the limit is reached.
+
+## Toolbar Positioning
+
+The toolbar is draggable and remembers its position using localStorage.
+
+### Default Behavior
+
+- Appears in the bottom-right corner by default
+- Can be dragged to any corner
+- Position persists across page reloads
+- Maintains safe area of 24px from viewport edges
+
+### Collapsible State
+
+The toolbar can collapse to save screen space:
+
+```typescript
+// Collapsed sizes from widget/index.tsx
+const COLLAPSED_SIZE = {
+  horizontal: { width: 20, height: 48 },
+  vertical: { width: 48, height: 20 },
+};
+```
+
+Collapsed position is stored separately in localStorage under `react-scan-widget-collapsed-v1`.
+
+## Minimum Dimensions
+
+The toolbar enforces minimum size constraints:
+
+```typescript
+export const MIN_SIZE = {
+  width: 550,
+  height: 350,
+  initialHeight: 400,
+};
+
+export const SAFE_AREA = 24;
+```
+
+## Error Handling
+
+The toolbar includes an error boundary to gracefully handle crashes:
+
+```tsx
+// From toolbar.tsx
+class ToolbarErrorBoundary extends Component {
+  state = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="fixed bottom-4 right-4">
+          <div className="p-3 bg-black rounded-lg shadow-lg">
+            <div className="text-red-400">React Scan ran into a problem</div>
+            <button onClick={this.handleReset}>Restart</button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+```
+
+If the toolbar crashes, you'll see an error message with a restart button.
+
+## Local Storage Keys
+
+The toolbar stores configuration in localStorage:
+
+- `react-scan-widget-settings-v2`: Widget position and dimensions
+- `react-scan-widget-collapsed-v1`: Collapsed state
+- `react-scan-widget-last-view-v1`: Last active view
+- `react-scan-options`: Scanning options (enabled state, etc.)
+
+<Note>
+Clearing localStorage will reset toolbar position and settings to defaults.
+</Note>
+
+## Implementation Details
+
+### Shadow Root Isolation
+
+The toolbar creates a shadow root for style isolation:
+
+```typescript
+// From core/index.ts
+const initRootContainer = (): RootContainer => {
+  const rootContainer = document.createElement('div');
+  rootContainer.id = 'react-scan-root';
+  
+  const shadowRoot = rootContainer.attachShadow({ mode: 'open' });
+  
+  const cssStyles = document.createElement('style');
+  cssStyles.textContent = styles;
+  shadowRoot.appendChild(cssStyles);
+  
+  document.documentElement.appendChild(rootContainer);
+  
+  return { rootContainer, shadowRoot };
+};
+```
+
+### Lifecycle Management
+
+The toolbar properly cleans up when removed:
+
+```typescript
+container.remove = () => {
+  window.__REACT_SCAN_TOOLBAR_CONTAINER__ = undefined;
+  
+  if (container.hasChildNodes()) {
+    // Double render(null) ensures full cleanup
+    render(null, container);
+    render(null, container);
+  }
+  
+  originalRemove();
+};
+```
+
+<Warning>
+The toolbar requires double rendering with `null` to fully unmount Preact components and clean up event listeners.
+</Warning>
+
+## Best Practices
+
+1. **Keep toolbar visible during development** to monitor performance in real-time
+2. **Check FPS meter** during interactions to identify rendering bottlenecks
+3. **Monitor notification count** to track performance regressions
+4. **Collapse toolbar when needed** to maximize screen space without losing functionality
+5. **Disable in production** by setting `enabled: false` or conditionally based on `process.env.NODE_ENV`
+
+## Related Options
+
+- [Render Detection](/features/render-detection) - Configure what renders to highlight
+- [Performance Monitoring](/features/performance-monitoring) - Track and analyze performance
+- [Browser Extension](/features/browser-extension) - Use React Scan as a browser extension

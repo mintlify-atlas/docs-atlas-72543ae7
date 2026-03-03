@@ -1,0 +1,165 @@
+---
+title: 'setOptions()'
+description: 'Update React Scan options at runtime'
+---
+
+## Overview
+
+The `setOptions()` function allows you to modify React Scan configuration options dynamically at runtime. This is useful for toggling features or updating settings without reinitializing.
+
+## Signature
+
+```typescript
+setOptions(userOptions: Partial<Options>): Options | undefined
+```
+
+## Parameters
+
+<ParamField path="userOptions" type="Partial<Options>" required>
+  Partial configuration object with options to update. Only the specified options will be changed; others remain unchanged.
+  
+  <Expandable title="Available Options">
+    <ParamField path="enabled" type="boolean">
+      Enable or disable scanning
+    </ParamField>
+    
+    <ParamField path="showToolbar" type="boolean">
+      Show or hide the toolbar
+    </ParamField>
+    
+    <ParamField path="log" type="boolean">
+      Enable or disable console logging of renders
+    </ParamField>
+    
+    <ParamField path="animationSpeed" type="'slow' | 'fast' | 'off'">
+      Speed of render highlight animations
+    </ParamField>
+    
+    <ParamField path="dangerouslyForceRunInProduction" type="boolean">
+      Force React Scan to run in production (not recommended)
+    </ParamField>
+    
+    <ParamField path="trackUnnecessaryRenders" type="boolean">
+      Track and mark unnecessary renders with gray outlines
+    </ParamField>
+    
+    <ParamField path="showFPS" type="boolean">
+      Show FPS meter in the toolbar
+    </ParamField>
+    
+    <ParamField path="showNotificationCount" type="boolean">
+      Show slowdown notification count in the toolbar
+    </ParamField>
+    
+    <ParamField path="allowInIframe" type="boolean">
+      Allow React Scan to run inside iframes
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Returns
+
+<ResponseField name="options" type="Options | undefined">
+  Returns the updated options object if successful, or `undefined` if an error occurred during validation.
+</ResponseField>
+
+## Usage
+
+### Toggle Scanning
+
+```tsx
+import { setOptions } from 'react-scan';
+
+// Disable scanning
+setOptions({ enabled: false });
+
+// Re-enable scanning
+setOptions({ enabled: true });
+```
+
+### Update Multiple Options
+
+```tsx
+import { setOptions } from 'react-scan';
+
+setOptions({
+  enabled: true,
+  showToolbar: false,
+  log: true,
+  animationSpeed: 'slow',
+});
+```
+
+### Toggle Toolbar Visibility
+
+```tsx
+import { setOptions } from 'react-scan';
+
+function toggleToolbar() {
+  const currentOptions = getOptions();
+  setOptions({ 
+    showToolbar: !currentOptions.value.showToolbar 
+  });
+}
+```
+
+### Enable Production Mode
+
+```tsx
+import { setOptions } from 'react-scan';
+
+setOptions({
+  dangerouslyForceRunInProduction: true,
+});
+```
+
+<Warning>
+  Using `dangerouslyForceRunInProduction` in production environments can impact application performance.
+</Warning>
+
+### Track Unnecessary Renders
+
+```tsx
+import { setOptions } from 'react-scan';
+
+setOptions({
+  trackUnnecessaryRenders: true,
+});
+```
+
+<Note>
+  Tracking unnecessary renders can add meaningful overhead to React Scan. An unnecessary render is defined as a component re-rendering with no change to the component's corresponding DOM subtree.
+</Note>
+
+## Validation
+
+The function validates all provided options:
+
+- Boolean options must be valid booleans
+- `animationSpeed` must be one of: `'slow'`, `'fast'`, or `'off'`
+- Callback options (`onCommitStart`, `onRender`, `onCommitFinish`) must be functions
+- Unknown options will trigger a console warning
+- Invalid options are ignored and not applied
+
+### Error Handling
+
+```tsx
+import { setOptions } from 'react-scan';
+
+// Invalid options will log warnings to console
+setOptions({
+  enabled: 'yes', // ❌ Invalid - must be boolean
+  animationSpeed: 'medium', // ❌ Invalid - must be 'slow', 'fast', or 'off'
+  unknownOption: true, // ❌ Invalid - unknown option
+});
+```
+
+## Persistence
+
+Options set via `setOptions()` are automatically persisted to `localStorage` (except for callback functions). They will be restored when React Scan initializes on subsequent page loads.
+
+## See Also
+
+- [getOptions()](/api-reference/get-options) - Get current options
+- [scan()](/api-reference/scan) - Initialize with options
+- [Options](/api-reference/options) - Full options reference

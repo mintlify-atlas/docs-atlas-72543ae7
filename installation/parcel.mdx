@@ -1,0 +1,93 @@
+---
+title: Parcel
+description: Install React Scan in Parcel projects
+---
+
+Install React Scan in your Parcel project using a script tag.
+
+## Script Tag Method
+
+<Steps>
+  <Step title="Open your index.html">
+    Navigate to your `index.html` file (usually in `src/index.html`).
+  </Step>
+
+  <Step title="Add the script tag">
+    Add the React Scan script in the `<head>` section:
+
+    ```html src/index.html
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <script
+          crossOrigin="anonymous"
+          src="//unpkg.com/react-scan/dist/auto.global.js"
+        ></script>
+        <!-- rest of your scripts go under -->
+      </head>
+      <body>
+        <div id="root"></div>
+        <script type="module" src="./index.tsx"></script>
+      </body>
+    </html>
+    ```
+  </Step>
+
+  <Step title="Verify it works">
+    Start your Parcel dev server and open your app. You should see the React Scan toolbar.
+  </Step>
+</Steps>
+
+## Module Import Method
+
+<Steps>
+  <Step title="Install the package">
+    <CodeGroup>
+      ```bash npm
+      npm install -D react-scan
+      ```
+
+      ```bash pnpm
+      pnpm add -D react-scan
+      ```
+
+      ```bash yarn
+      yarn add -D react-scan
+      ```
+
+      ```bash bun
+      bun add -D react-scan
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Add to your entry point">
+    Import React Scan in your entry file (e.g., `src/index.tsx`):
+
+    ```tsx src/index.tsx
+    // must be imported before React and React DOM
+    import { scan } from "react-scan";
+    import React from "react";
+    import ReactDOM from "react-dom/client";
+    import App from "./App";
+
+    scan({
+      enabled: true,
+    });
+
+    ReactDOM.createRoot(document.getElementById("root")!).render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>
+    );
+    ```
+
+    <Warning>
+      React Scan must be imported before React and React DOM.
+    </Warning>
+  </Step>
+</Steps>
+
+<Note>
+  React Scan only runs in development by default. It will not affect your production builds.
+</Note>

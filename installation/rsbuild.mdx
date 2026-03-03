@@ -1,0 +1,132 @@
+---
+title: Rsbuild
+description: Install React Scan in Rsbuild projects
+---
+
+Install React Scan in your Rsbuild project using either the configuration file or a script tag.
+
+## Configuration Method
+
+<Steps>
+  <Step title="Open your Rsbuild config">
+    Navigate to `rsbuild.config.ts` (or `rsbuild.config.js`).
+  </Step>
+
+  <Step title="Add the script via html.tags">
+    Use Rsbuild's [html.tags](https://rsbuild.dev/config/html/tags) configuration:
+
+    ```ts rsbuild.config.ts
+    export default {
+      html: {
+        tags: [
+          {
+            tag: "script",
+            attrs: {
+              src: "https://cdn.jsdelivr.net/npm/react-scan/dist/auto.global.js",
+              crossOrigin: "anonymous",
+            },
+            append: false,
+          },
+        ],
+      },
+    };
+    ```
+
+    <Note>
+      Setting `append: false` ensures the script loads before other scripts.
+    </Note>
+  </Step>
+</Steps>
+
+## Script Tag Method (Custom Template)
+
+If you're using a custom HTML template:
+
+<Steps>
+  <Step title="Open your HTML template">
+    Navigate to your custom HTML template file.
+  </Step>
+
+  <Step title="Add the script tag">
+    Add the React Scan script in the `<head>` section:
+
+    ```html index.html
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <script
+          crossOrigin="anonymous"
+          src="//cdn.jsdelivr.net/npm/react-scan/dist/auto.global.js"
+        ></script>
+        <!-- rest of your scripts go under -->
+      </head>
+      <body>
+        <div id="root"></div>
+      </body>
+    </html>
+    ```
+  </Step>
+</Steps>
+
+## Module Import Method
+
+<Steps>
+  <Step title="Install the package">
+    <CodeGroup>
+      ```bash npm
+      npm install -D react-scan
+      ```
+
+      ```bash pnpm
+      pnpm add -D react-scan
+      ```
+
+      ```bash yarn
+      yarn add -D react-scan
+      ```
+
+      ```bash bun
+      bun add -D react-scan
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Add to your entry point">
+    Import React Scan in your entry file (e.g., `src/index.tsx` or `src/main.tsx`):
+
+    ```tsx src/index.tsx
+    // must be imported before React and React DOM
+    import { scan } from "react-scan";
+    import React from "react";
+    import ReactDOM from "react-dom/client";
+    import App from "./App";
+
+    scan({
+      enabled: true,
+    });
+
+    ReactDOM.createRoot(document.getElementById("root")!).render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>
+    );
+    ```
+
+    <Warning>
+      React Scan must be imported before React and React DOM in your entire project, as it needs to hijack React DevTools before React gets to access it.
+    </Warning>
+  </Step>
+</Steps>
+
+## Running in Production
+
+By default, React Scan only runs in development. To enable it in production:
+
+```diff
+- import { scan } from "react-scan";
++ import { scan } from "react-scan/all-environments";
+```
+
+<Warning>
+  Running React Scan in production is not recommended as it may impact performance.
+</Warning>

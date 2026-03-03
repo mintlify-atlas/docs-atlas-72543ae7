@@ -1,0 +1,103 @@
+---
+title: Next.js Pages Router
+description: Install React Scan in Next.js Pages Router projects
+---
+
+Install React Scan in your Next.js Pages Router project using either a script tag or module import.
+
+## Script Tag Method
+
+<Steps>
+  <Step title="Open your document file">
+    Navigate to `pages/_document.tsx` (or `pages/_document.jsx`).
+  </Step>
+
+  <Step title="Add the Script component">
+    Import Next.js's `Script` component and add React Scan:
+
+    ```tsx pages/_document.tsx
+    import { Html, Head, Main, NextScript } from "next/document";
+    import Script from "next/script";
+
+    export default function Document() {
+      return (
+        <Html lang="en">
+          <Head>
+            <Script
+              src="//unpkg.com/react-scan/dist/auto.global.js"
+              crossOrigin="anonymous"
+              strategy="beforeInteractive"
+            />
+          </Head>
+          <body>
+            <Main />
+            <NextScript />
+          </body>
+        </Html>
+      );
+    }
+    ```
+  </Step>
+</Steps>
+
+## Module Import Method
+
+<Steps>
+  <Step title="Install the package">
+    <CodeGroup>
+      ```bash npm
+      npm install -D react-scan
+      ```
+
+      ```bash pnpm
+      pnpm add -D react-scan
+      ```
+
+      ```bash yarn
+      yarn add -D react-scan
+      ```
+
+      ```bash bun
+      bun add -D react-scan
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Add to your App component">
+    Open `pages/_app.tsx` and add React Scan:
+
+    ```tsx pages/_app.tsx
+    // react-scan must be the top-most import
+    import { scan } from "react-scan";
+    import { useEffect } from "react";
+
+    export default function App({ Component, pageProps }) {
+      useEffect(() => {
+        // Make sure to run React Scan after hydration
+        scan({
+          enabled: true,
+        });
+      }, []);
+      
+      return <Component {...pageProps} />;
+    }
+    ```
+
+    <Warning>
+      The `react-scan` import must be the top-most import in your `_app.tsx` file.
+    </Warning>
+  </Step>
+</Steps>
+
+## Running in Production
+
+By default, React Scan only runs in development. To enable it in production:
+
+```diff
+- import { scan } from "react-scan";
++ import { scan } from "react-scan/all-environments";
+```
+
+<Warning>
+  Running React Scan in production is not recommended as it may impact performance.
+</Warning>

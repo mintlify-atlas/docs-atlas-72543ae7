@@ -1,0 +1,233 @@
+---
+title: 'ignoreScan()'
+description: 'Exclude specific React nodes from render tracking'
+---
+
+## Overview
+
+The `ignoreScan()` function marks React elements to be excluded from React Scan's render tracking and highlighting. This is useful for preventing animations, tooltips, or other frequently-updating components from cluttering the scan visualization.
+
+## Signature
+
+```typescript
+ignoreScan(node: ReactNode): void
+```
+
+## Parameters
+
+<ParamField path="node" type="ReactNode" required>
+  The React node to exclude from scanning. Must be a valid React element object (not primitives like strings, numbers, or booleans).
+  
+  Valid types:
+  - React elements created with JSX or `React.createElement()`
+  - Component instances
+  - Fragments
+  
+  Invalid types (will be ignored silently):
+  - `null` or `undefined`
+  - Strings, numbers, booleans, or bigints
+</ParamField>
+
+## Returns
+
+`void` - This function does not return a value.
+
+## Usage
+
+### Ignore Animated Components
+
+```tsx
+import { ignoreScan } from 'react-scan';
+
+function AnimatedBanner() {
+  const banner = <div className="animated-banner">Welcome!</div>;
+  
+  // Exclude this banner from scan tracking
+  ignoreScan(banner);
+  
+  return banner;
+}
+```
+
+### Ignore High-Frequency Updates
+
+```tsx
+import { ignoreScan } from 'react-scan';
+
+function LiveClock() {
+  const [time, setTime] = useState(new Date());
+  
+  useEffect(() => {
+    const interval = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  const clock = <div>{time.toLocaleTimeString()}</div>;
+  
+  // Don't track these frequent updates
+  ignoreScan(clock);
+  
+  return clock;
+}
+```
+
+### Ignore Tooltip Components
+
+```tsx
+import { ignoreScan } from 'react-scan';
+
+function TooltipWrapper({ children, tooltip }) {
+  const [isVisible, setIsVisible] = useState(false);
+  
+  const tooltipElement = isVisible ? <div className="tooltip">{tooltip}</div> : null;
+  
+  if (tooltipElement) {
+    ignoreScan(tooltipElement);
+  }
+  
+  return (
+    <div 
+      onMouseEnter={() => setIsVisible(true)}
+      onMouseLeave={() => setIsVisible(false)}
+    >
+      {children}
+      {tooltipElement}
+    </div>
+  );
+}
+```
+
+### Ignore List Items
+
+```tsx
+import { ignoreScan } from 'react-scan';
+
+function UserList({ users }) {
+  return (
+    <ul>
+      {users.map(user => {
+        const item = <li key={user.id}>{user.name}</li>;
+        ignoreScan(item);
+        return item;
+      })}
+    </ul>
+  );
+}
+```
+
+### Ignore Fragments
+
+```tsx
+import { ignoreScan } from 'react-scan';
+
+function MultiElementComponent() {
+  const content = (
+    <>
+      <Header />
+      <Content />
+      <Footer />
+    </>
+  );
+  
+  ignoreScan(content);
+  
+  return content;
+}
+```
+
+### Conditional Ignoring
+
+```tsx
+import { ignoreScan } from 'react-scan';
+
+function OptimizedComponent({ shouldTrack, children }) {
+  const element = <div>{children}</div>;
+  
+  // Only ignore if tracking is disabled
+  if (!shouldTrack) {
+    ignoreScan(element);
+  }
+  
+  return element;
+}
+```
+
+## How It Works
+
+Internally, `ignoreScan()` maintains a `WeakSet` of ignored React nodes. When React Scan processes renders:
+
+1. It checks if the rendered element is in the ignored set
+2. If found, the element and its children are excluded from:
+   - Render highlighting
+   - Performance tracking
+   - Render count statistics
+   - Console logging (if enabled)
+
+```typescript
+// Internal implementation reference
+export const ignoredProps = new WeakSet<
+  Exclude<ReactNode, undefined | null | string | number | boolean | bigint>
+>();
+
+export const ignoreScan = (node: ReactNode) => {
+  if (node && typeof node === 'object') {
+    ignoredProps.add(node);
+  }
+};
+```
+
+## Best Practices
+
+### When to Use
+
+- **High-frequency updates**: Components that update many times per second (clocks, animations, live data)
+- **Visual noise reduction**: Elements that render frequently but aren't important for performance analysis
+- **Third-party components**: External library components you don't control
+- **Known performant code**: Components you've already optimized and don't need to track
+
+### When Not to Use
+
+- **Don't ignore everything**: Defeats the purpose of React Scan
+- **Don't ignore performance issues**: If a component is slow, investigate instead of hiding it
+- **Don't ignore by default**: Only ignore components that genuinely clutter the analysis
+
+## Limitations
+
+- Primitives (strings, numbers, booleans) are silently ignored and won't cause errors
+- `null` and `undefined` values are ignored and won't cause errors
+- Once a node is marked as ignored, it cannot be un-ignored without page reload
+- Ignored nodes must be object references - the same element instance must be passed to `ignoreScan()`
+
+```tsx
+// ❌ Won't work - different object instances
+function Component() {
+  ignoreScan(<div>Content</div>);
+  return <div>Content</div>; // Different instance
+}
+
+// ✅ Works - same object instance
+function Component() {
+  const content = <div>Content</div>;
+  ignoreScan(content);
+  return content; // Same instance
+}
+```
+
+## TypeScript Types
+
+```typescript
+import type { ReactNode } from 'react';
+
+type IgnorableNode = Exclude<
+  ReactNode,
+  undefined | null | string | number | boolean | bigint
+>;
+
+function ignoreScan(node: ReactNode): void;
+```
+
+## See Also
+
+- [onRender()](/api-reference/on-render) - Monitor specific component renders
+- [Options](/api-reference/options) - Configure global scanning behavior
+- [setOptions()](/api-reference/set-options) - Toggle scanning at runtime
