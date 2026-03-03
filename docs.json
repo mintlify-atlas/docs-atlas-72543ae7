@@ -78,6 +78,7 @@
               "api-reference/set-options",
               "api-reference/get-options",
               "api-reference/on-render",
+              "api-reference/get-report",
               "api-reference/ignore-scan"
             ]
           },

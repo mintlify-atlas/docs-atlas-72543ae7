@@ -1,0 +1,161 @@
+---
+title: getReport()
+description: Retrieve performance data for React components
+---
+
+The `getReport()` function retrieves render performance data for specific components or all components tracked by React Scan.
+
+## Signature
+
+```typescript
+function getReport(type?: ComponentType<unknown>): RenderData | null | Map<string, RenderData>
+```
+
+<ParamField path="type" type="ComponentType<unknown>" optional>
+  The component class or function to get data for. If omitted, returns all reports.
+</ParamField>
+
+## Returns
+
+<ResponseField name="return" type="RenderData | null | Map<string, RenderData>">
+  - If `type` is provided: Returns a `RenderData` object for that component, or `null` if not found
+  - If `type` is omitted: Returns a `Map<string, RenderData>` containing all component reports
+
+  <Expandable title="RenderData">
+    <ResponseField name="count" type="number">
+      Total number of renders for this component
+    </ResponseField>
+    <ResponseField name="time" type="number">
+      Total time spent rendering (in milliseconds)
+    </ResponseField>
+    <ResponseField name="renders" type="Array<Render>">
+      Array of individual render records. See [Types](/api-reference/types) for `Render` structure.
+    </ResponseField>
+    <ResponseField name="displayName" type="string | null">
+      Component display name
+    </ResponseField>
+    <ResponseField name="type" type="unknown">
+      Component type (class or function reference)
+    </ResponseField>
+    <ResponseField name="changes" type="Array<RenderChange>" optional>
+      Array of detected changes (props, state, context) that caused renders
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage
+
+### Get Specific Component Data
+
+```typescript
+import { getReport } from 'react-scan';
+
+function MyComponent() {
+  return <div>Hello</div>;
+}
+
+// Get report for a specific component
+const report = getReport(MyComponent);
+
+if (report) {
+  console.log(`${report.displayName} rendered ${report.count} times`);
+  console.log(`Total render time: ${report.time}ms`);
+  console.log(`Average time per render: ${report.time / report.count}ms`);
+}
+```
+
+### Get All Component Reports
+
+```typescript
+import { getReport } from 'react-scan';
+
+// Get all reports
+const allReports = getReport();
+
+// Iterate through all components
+allReports.forEach((report, key) => {
+  console.log(`${report.displayName}:`, {
+    renders: report.count,
+    totalTime: report.time,
+    avgTime: report.time / report.count
+  });
+});
+```
+
+### Find Performance Bottlenecks
+
+```typescript
+import { getReport } from 'react-scan';
+
+function analyzePerformance() {
+  const allReports = getReport();
+  const slowComponents = [];
+
+  allReports.forEach((report) => {
+    const avgTime = report.time / report.count;
+    
+    // Flag components with average render time > 16ms (60fps threshold)
+    if (avgTime > 16) {
+      slowComponents.push({
+        name: report.displayName,
+        count: report.count,
+        avgTime,
+        totalTime: report.time
+      });
+    }
+  });
+
+  // Sort by total time
+  slowComponents.sort((a, b) => b.totalTime - a.totalTime);
+  
+  console.table(slowComponents);
+}
+```
+
+### Export Performance Data
+
+```typescript
+import { getReport } from 'react-scan';
+
+function exportPerformanceData() {
+  const allReports = getReport();
+  const data = [];
+
+  allReports.forEach((report) => {
+    data.push({
+      component: report.displayName,
+      renders: report.count,
+      totalTime: report.time,
+      averageTime: (report.time / report.count).toFixed(2),
+      changes: report.changes?.length || 0
+    });
+  });
+
+  // Export as JSON
+  const json = JSON.stringify(data, null, 2);
+  console.log(json);
+  
+  // Or send to analytics
+  // analytics.track('performance_report', { components: data });
+}
+```
+
+## Notes
+
+<Note>
+  Reports are stored in `Store.legacyReportData` and are only available when React Scan is actively running.
+</Note>
+
+<Warning>
+  Report data persists across component unmounts. Call `getReport()` to check accumulated data since React Scan started.
+</Warning>
+
+<Tip>
+  Use `getReport()` with [onRender()](/api-reference/on-render) to build custom performance monitoring dashboards.
+</Tip>
+
+## See Also
+
+- [onRender()](/api-reference/on-render) - Monitor component renders in real-time
+- [Types](/api-reference/types) - Type definitions for `RenderData` and `Render`
+- [Custom Monitoring](/guides/custom-monitoring) - Build custom analytics with React Scan
